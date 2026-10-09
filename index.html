@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PM Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23000'/><path d='M4 24 L11 15 L17 19 L28 6' stroke='%23ffa028' stroke-width='3' fill='none'/></svg>" />
+</head>
+<body>
+  <div id="app">
+    <!-- ── Top bar: brand, command line, clock ── -->
+    <header class="topbar">
+      <div class="brand"><span class="brand-tag" id="brandTag"></span><span class="brand-name" id="brandName"></span></div>
+      <form class="cmd" id="cmdForm" autocomplete="off">
+        <span class="cmd-prompt">&gt;</span>
+        <input id="cmdInput" spellcheck="false" placeholder="BTCUSDT 1D   ·   AAPL 1W   ·   HELP" />
+        <button type="submit" class="go">GO</button>
+      </form>
+      <div class="clock"><span id="clockLocal"></span><span class="dim" id="clockUtc"></span></div>
+    </header>
+
+    <!-- ── Symbol strip ── -->
+    <section class="symbar">
+      <div class="sym">
+        <span id="symName" class="amber big"></span>
+        <span id="symSource" class="badge"></span>
+        <span id="symLast" class="big"></span>
+        <span id="symChange"></span>
+      </div>
+      <div class="ohlc" id="ohlc"></div>
+      <div class="intervals" id="intervals"></div>
+      <div class="status"><span class="dot" id="liveDot"></span><span id="liveText">CONNECTING</span></div>
+    </section>
+
+    <!-- ── Main: chart + side panels ── -->
+    <main class="main">
+      <section class="chart-wrap">
+        <div class="legend" id="legend"></div>
+        <div id="chart"></div>
+        <div class="msg" id="chartMsg"></div>
+      </section>
+
+      <aside class="side">
+        <div class="panel">
+          <div class="panel-h">WATCHLIST <span class="dim">CRYPTO · LIVE</span></div>
+          <table class="watch" id="watch"></table>
+          <div class="panel-h sub">STOCKS <span class="dim">TWELVE DATA</span></div>
+          <table class="watch" id="watchStocks"></table>
+        </div>
+        <div class="panel">
+          <div class="panel-h">STUDIES <span class="dim">F3</span></div>
+          <div id="studies" class="studies"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h">HPDR RANGE <span class="dim">F4</span></div>
+          <div class="hpdr">
+            <div class="meter"><div class="meter-fill" id="hpdrFill"></div><div class="meter-mid"></div></div>
+            <div class="hpdr-row"><span class="dim">POSITION</span><span id="hpdrPos">—</span></div>
+            <div class="hpdr-row"><span class="dim">ZONE</span><span id="hpdrZone">—</span></div>
+          </div>
+        </div>
+        <div class="panel grow">
+          <div class="panel-h">SIGNALS <span class="dim" id="crossLabel"></span></div>
+          <ul class="signals" id="signals"></ul>
+        </div>
+      </aside>
+    </main>
+
+    <!-- ── Function keys ── -->
+    <footer class="fkeys">
+      <button data-key="F1"><b>F1</b>HELP</button>
+      <button data-key="F2"><b>F2</b>SYMBOL</button>
+      <button data-key="F3"><b>F3</b>STUDIES</button>
+      <button data-key="F4"><b>F4</b>HPDR</button>
+      <button data-key="F8"><b>F8</b>SETTINGS</button>
+      <span class="fk-note dim">NOT FINANCIAL ADVICE · SIGNALS ON CLOSED CANDLES ONLY</span>
+    </footer>
+  </div>
+
+  <!-- ── Modal (help / settings) ── -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal-box">
+      <div class="panel-h"><span id="modalTitle"></span><button class="x" id="modalClose">ESC ✕</button></div>
+      <div id="modalBody" class="modal-body"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
