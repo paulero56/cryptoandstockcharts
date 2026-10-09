@@ -2,35 +2,89 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sma, ema } from '../src/indicators/ma.js';
 import { crossovers } from '../src/indicators/cross.js';
-import { computeHpdr } from '../src/indicators/hpdr.js';
+import { computeHpdr, percentile } from '../src/indicators/hpdr.js';
+import { stochastic, rsi, divergences, dmi, smaN, forecast, autoFib, stochVolatility } from '../src/indicators/oscillators.js';
+
+const close = n => Array.from({ length: n }, (_, i) => 100 + 10 * Math.sin(i / 7) + i * 0.2);
 
 test('SMA', () => {
   assert.deepEqual(sma([1, 2, 3, 4, 5], 3), [null, null, 2, 3, 4]);
 });
 
 test('EMA seeded with SMA', () => {
-  const r = ema([1, 2, 3, 4, 5], 3); // k = 0.5
-  assert.deepEqual(r, [null, null, 2, 3, 4]);
-  const r2 = ema([2, 4, 6, 10], 3); // seed 4, then 10*0.5+4*0.5 = 7
-  assert.deepEqual(r2, [null, null, 4, 7]);
+  assert.deepEqual(ema([1, 2, 3, 4, 5], 3), [null, null, 2, 3, 4]);
+  assert.deepEqual(ema([2, 4, 6, 10], 3), [null, null, 4, 7]);
 });
 
 test('crossovers ignore the open candle', () => {
-  const fast = [1, 1, 3, 3, 1];
-  const slow = [2, 2, 2, 2, 2];
-  assert.deepEqual(crossovers(fast, slow), [
-    { index: 2, type: 'bull' }, { index: 4, type: 'bear' },
-  ]);
+  const fast = [1, 1, 3, 3, 1], slow = [2, 2, 2, 2, 2];
+  assert.deepEqual(crossovers(fast, slow), [{ index: 2, type: 'bull' }, { index: 4, type: 'bear' }]);
   assert.deepEqual(crossovers(fast, slow, 3), [{ index: 2, type: 'bull' }]);
 });
 
-test('HPDR levels sit between range low and high', () => {
-  const high = [10, 12, 14, 13, 15], low = [5, 6, 7, 8, 9], close = [8, 10, 12, 11, 15];
-  const r = computeHpdr({ high, low, close }, { longLength: 3, shortLength: 2, longWeight: 0.5, levels: [0, 50, 100] });
-  // i=4: long hi=15 lo=7, short hi=15 lo=8 → top 15, bot 7.5
-  assert.equal(r.levels[100][4], 15);
-  assert.equal(r.levels[0][4], 7.5);
-  assert.equal(r.levels[50][4], 11.25);
-  assert.equal(r.position[4], 100);
-  assert.equal(r.levels[50][1], null);
+test('percentile interpolates', () => {
+  assert.equal(percentile([0, 10], 50), 5);
+  assert.equal(percentile([1, 2, 3, 4, 5], 100), 5);
+  assert.equal(percentile([1, 2, 3, 4, 5], 0), 1);
+});
+
+test('HPDR: constant growth → all bands equal the expected price', () => {
+  const src = Array.from({ length: 80 }, (_, i) => 100 * 1.01 ** i);
+  const r = computeHpdr(src, { length: 7, ranges: [50, 100] });
+  const t = 70, expect = src[t];
+  for (const v of [r.median[t], r.upper[50][t], r.lower[100][t]]) assert.ok(Math.abs(v - expect) < 1e-6);
+  assert.equal(r.median[20], null); // not enough samples yet
+});
+
+test('HPDR: bands are ordered and oscillators stay 0–100', () => {
+  const r = computeHpdr(close(400), { length: 7, ranges: [38.2, 61.8, 95, 100], project: true });
+  const t = 399;
+  assert.ok(r.lower[100][t] <= r.lower[95][t] && r.lower[95][t] <= r.lower[61.8][t] && r.lower[61.8][t] <= r.median[t]);
+  assert.ok(r.median[t] <= r.upper[38.2][t] && r.upper[38.2][t] <= r.upper[100][t]);
+  for (const v of [...r.osc, ...r.vol]) if (v != null) assert.ok(v >= 0 && v <= 100);
+  assert.equal(r.projection.median.length, 7);
+});
+
+test('HPDR maxArray caps the history used', () => {
+  const r = computeHpdr(close(300), { length: 7, maxArray: 40, ranges: [100] });
+  assert.ok(r.upper[100][299] != null);
+});
+
+test('Stochastic K/D in range', () => {
+  const c = close(100), h = c.map(x => x + 1), l = c.map(x => x - 1);
+  const s = stochastic({ high: h, low: l, close: c }, { k: 14, d: 3, smooth: 6 });
+  const firstK = s.k.findIndex(v => v != null);
+  assert.equal(firstK, 13 + 5);
+  assert.equal(s.d.findIndex(v => v != null), firstK + 2);
+  for (const v of [...s.k, ...s.d]) if (v != null) assert.ok(v >= 0 && v <= 100);
+  assert.equal(forecast(s.k, 3).length, 3);
+});
+
+test('Cutler RSI: all-up = 100, all-down = 0, flat = 50', () => {
+  assert.equal(rsi([1, 2, 3, 4, 5, 6], 3).at(-1), 100);
+  assert.equal(rsi([6, 5, 4, 3, 2, 1], 3).at(-1), 0);
+  assert.equal(rsi([1, 1, 1, 1, 1], 3).at(-1), 50);
+  const w = rsi(close(100), 14, 'wilder'), c = rsi(close(100), 14, 'cutler');
+  assert.notEqual(w.at(-1), c.at(-1));
+});
+
+test('Divergence: lower price low + higher osc low = regular bull', () => {
+  //            0  1  2  3  4  5  6  7  8  9 10 11 12
+  const price = [9, 8, 7, 5, 7, 8, 9, 8, 6, 4, 6, 7, 8];
+  const osc =   [50, 45, 40, 20, 40, 50, 55, 45, 35, 30, 40, 50, 55];
+  const d = divergences(price, osc, { left: 2, right: 2, lookback: 50 });
+  assert.deepEqual(d.lows, [3, 9]);
+  assert.deepEqual(d.list, [{ index: 9, from: 3, type: 'regBull' }]);
+});
+
+test('DMI/ADX produce values', () => {
+  const c = close(120), r = dmi({ high: c.map(x => x + 1), low: c.map(x => x - 1), close: c }, 14);
+  assert.ok(r.adx.at(-1) > 0 && r.adx.at(-1) <= 100);
+});
+
+test('smaN skips leading nulls; autoFib endpoints; stochVol range', () => {
+  assert.deepEqual(smaN([null, 2, 4, 6], 2), [null, null, 3, 5]);
+  const f = autoFib({ high: [1, 5, 10], low: [0, 2, 3] }, 3);
+  assert.equal(f[0].price, 10); assert.equal(f.at(-1).price, 0);
+  for (const v of stochVolatility(close(300), { lookback: 100 })) if (v != null) assert.ok(v >= 0 && v <= 100);
 });

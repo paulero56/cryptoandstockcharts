@@ -1,50 +1,96 @@
 // ─────────────────────────────────────────────────────────────
-//  HPDR-STYLE BANDS  —  APPROXIMATION
+//  HPDR — Historical Price Delta Range  (own implementation)
 //
-//  The original "HPDR Bands Indicator" by afonso_77 on TradingView is
-//  open source, but its exact formula isn't published outside the Pine
-//  code. This is a stand-in built from its public description:
-//    • a price range from historical highs/lows, blending a long and a
-//      short lookback
-//    • Fibonacci-like levels inside that range + a 50% midline
-//    • a "range position" value: where the close sits in the range (0–100)
+//  Idea (public concept): collect every historical N-bar price change
+//  ("delta"), sort them, and read percentiles. A "61.8 range" is the
+//  band that contained 61.8% of all past N-bar moves.
 //
-//  To match TradingView exactly, open the script's "Source code" on
-//  TradingView and replace computeHpdr() with a port of the Pine logic.
-//  Keep the same return shape and the rest of the app keeps working.
+//    delta[t]   = src[t] / src[t-N] − 1
+//    band p (t) = src[t-N] × (1 + percentile(deltas, 50 ± p/2))
+//    median (t) = src[t-N] × (1 + percentile(deltas, 50))
+//
+//  Only deltas known BEFORE bar t are used, so there is no look-ahead.
+//
+//  HPDRO (oscillator): percentile rank of the current delta (0–100).
+//  HPDRV (volatility): percentile rank of |current delta| (0–100).
+//
+//  This is written from the concept and the visible settings, not from
+//  the original (private / paid) scripts, so values can differ from them.
 // ─────────────────────────────────────────────────────────────
 
-function rolling(arr, length, pick) {
-  const out = new Array(arr.length).fill(null);
-  for (let i = length - 1; i < arr.length; i++) {
-    let v = arr[i];
-    for (let j = i - length + 1; j < i; j++) v = pick(v, arr[j]);
-    out[i] = v;
-  }
-  return out;
+const MIN_SAMPLES = 30;
+
+function insertSorted(arr, v) {
+  let lo = 0, hi = arr.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] < v) lo = m + 1; else hi = m; }
+  arr.splice(lo, 0, v);
+}
+function removeSorted(arr, v) {
+  let lo = 0, hi = arr.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] < v) lo = m + 1; else hi = m; }
+  arr.splice(lo, 1);
+}
+export function percentile(sorted, q) {
+  if (!sorted.length) return null;
+  const pos = (q / 100) * (sorted.length - 1);
+  const i = Math.floor(pos), f = pos - i;
+  return i + 1 < sorted.length ? sorted[i] + (sorted[i + 1] - sorted[i]) * f : sorted[i];
+}
+function rankOf(sorted, v) {
+  let lo = 0, hi = sorted.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (sorted[m] < v) lo = m + 1; else hi = m; }
+  let hi2 = lo;
+  while (hi2 < sorted.length && sorted[hi2] === v) hi2++;
+  return ((lo + hi2) / 2 / sorted.length) * 100; // mid-rank, 0–100
 }
 
 /**
- * @param {{high:number[], low:number[], close:number[]}} c
- * @returns {{levels: Record<string,(number|null)[]>, position: (number|null)[]}}
+ * @param {number[]} src  price source (e.g. closes)
+ * @param {{length:number, maxArray:number, ranges:number[], project?:boolean}} o
+ * @returns {{
+ *   median:(number|null)[], upper:Record<number,(number|null)[]>, lower:Record<number,(number|null)[]>,
+ *   osc:(number|null)[], vol:(number|null)[],
+ *   projection: null | {median:number[], upper:Record<number,number[]>, lower:Record<number,number[]>}
+ * }}
  */
-export function computeHpdr(c, { longLength, shortLength, longWeight, levels }) {
-  const hiL = rolling(c.high, longLength, Math.max);
-  const loL = rolling(c.low, longLength, Math.min);
-  const hiS = rolling(c.high, shortLength, Math.max);
-  const loS = rolling(c.low, shortLength, Math.min);
-  const w = longWeight;
+export function computeHpdr(src, { length: N, maxArray = 100000, ranges, project = false }) {
+  const n = src.length;
+  const median = new Array(n).fill(null), osc = new Array(n).fill(null), vol = new Array(n).fill(null);
+  const upper = {}, lower = {};
+  for (const p of ranges) { upper[p] = new Array(n).fill(null); lower[p] = new Array(n).fill(null); }
 
-  const top = hiL.map((v, i) => (v == null ? null : w * v + (1 - w) * hiS[i]));
-  const bot = loL.map((v, i) => (v == null ? null : w * v + (1 - w) * loS[i]));
+  const sorted = [], sortedAbs = [], fifo = [];
+  for (let t = N; t < n; t++) {
+    const base = src[t - N];
+    const d = src[t] / base - 1;
 
-  const out = {};
-  for (const lvl of levels) {
-    out[lvl] = top.map((t, i) => (t == null ? null : bot[i] + (t - bot[i]) * (lvl / 100)));
+    if (sorted.length >= MIN_SAMPLES) {
+      median[t] = base * (1 + percentile(sorted, 50));
+      for (const p of ranges) {
+        upper[p][t] = base * (1 + percentile(sorted, 50 + p / 2));
+        lower[p][t] = base * (1 + percentile(sorted, 50 - p / 2));
+      }
+      osc[t] = rankOf(sorted, d);
+      vol[t] = rankOf(sortedAbs, Math.abs(d));
+    }
+
+    insertSorted(sorted, d); insertSorted(sortedAbs, Math.abs(d)); fifo.push(d);
+    if (fifo.length > maxArray) { const old = fifo.shift(); removeSorted(sorted, old); removeSorted(sortedAbs, Math.abs(old)); }
   }
-  const position = c.close.map((cl, i) => {
-    if (top[i] == null || top[i] === bot[i]) return null;
-    return Math.max(0, Math.min(100, ((cl - bot[i]) / (top[i] - bot[i])) * 100));
-  });
-  return { levels: out, position };
+
+  // Forward projection: where the next N bars "should" land, from known bases.
+  let projection = null;
+  if (project && sorted.length >= MIN_SAMPLES) {
+    projection = { median: [], upper: {}, lower: {} };
+    for (const p of ranges) { projection.upper[p] = []; projection.lower[p] = []; }
+    for (let k = 1; k <= N; k++) {
+      const base = src[n - 1 - N + k];
+      projection.median.push(base * (1 + percentile(sorted, 50)));
+      for (const p of ranges) {
+        projection.upper[p].push(base * (1 + percentile(sorted, 50 + p / 2)));
+        projection.lower[p].push(base * (1 + percentile(sorted, 50 - p / 2)));
+      }
+    }
+  }
+  return { median, upper, lower, osc, vol, projection };
 }

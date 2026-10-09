@@ -120,3 +120,6 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .fk-note { display: none; }
 }
 .ohlc > span { white-space: nowrap; }
+
+.pane-legend { position: absolute; z-index: 3; left: 10px; pointer-events: none; font-size: 11px; background: rgba(0,0,0,.6); padding: 0 6px; white-space: nowrap; max-width: calc(100% - 90px); overflow: hidden; text-overflow: ellipsis; }
+.pane-legend b { color: var(--amber); font-weight: 600; margin-right: 4px; }
