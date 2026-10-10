@@ -103,7 +103,21 @@ export const JEWEL = {
   dmiFactor: 1,
 };
 
-export const WATCHLIST = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT'];
+// Default watchlist (you can add/remove symbols in the app; your list is saved in the browser).
+// Binance pairs update live. Symbols with "/" or plain tickers (COIN, CRCL…) use Twelve Data (key: F8).
+export const WATCHLIST = [
+  'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'BNBUSDT', 'DOGEUSDT', 'ADAUSDT', 'AVAXUSDT', 'LINKUSDT', 'SUIUSDT',
+  'PAXGUSDT',   // gold (PAX Gold token, tracks 1 oz) — live, no key
+  'USDTMXN',    // dollar vs Mexican peso (USDT/MXN) — live, no key
+  'COIN',       // Coinbase (stock)
+  'CRCL',       // Circle (stock)
+  'XAU/USD',    // gold spot
+  'USD/MXN',    // forex
+];
+// Friendly names shown in the watchlist
+export const LABELS = {
+  PAXGUSDT: 'GOLD·PAXG', USDTMXN: 'USD/MXN·T', COIN: 'COINBASE', CRCL: 'CIRCLE', 'XAU/USD': 'GOLD', 'USD/MXN': 'USD/MXN',
+};
 
-export const INTERVALS = ['1m', '5m', '15m', '1H', '4H', '1D', '1W', '1M'];
-export const INTERVAL_SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1H': 3600, '4H': 14400, '1D': 86400, '1W': 604800, '1M': 2592000 };
+export const INTERVALS = ['1m', '5m', '15m', '1H', '4H', '1D', '1W', '2W', '1M', '1Y'];
+export const INTERVAL_SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1H': 3600, '4H': 14400, '1D': 86400, '1W': 604800, '2W': 1209600, '1M': 2592000, '1Y': 31557600 };

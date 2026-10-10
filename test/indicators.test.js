@@ -108,3 +108,25 @@ test('MACD hist = macd − signal', () => {
   const i = 199;
   assert.ok(Math.abs(m.hist[i] - (m.macd[i] - m.signal[i])) < 1e-9);
 });
+
+import { resample, bucketKey, sourceFor } from '../src/data/index.js';
+
+test('2W / 1Y resampling', () => {
+  const wk = (d, o, h, l, c, v) => ({ time: Date.parse(d + 'T00:00:00Z') / 1000, open: o, high: h, low: l, close: c, volume: v });
+  const weeks = [wk('2026-01-05', 1, 5, 1, 2, 10), wk('2026-01-12', 2, 3, 0.5, 3, 20), wk('2026-01-19', 3, 9, 3, 8, 5)];
+  const r = resample(weeks, '2W');
+  assert.equal(r.length, 2);
+  assert.deepEqual({ ...r[0], time: 0 }, { time: 0, open: 1, high: 5, low: 0.5, close: 3, volume: 30 });
+  const months = ['2024-11-01', '2024-12-01', '2025-01-01'].map((d, i) => wk(d, i, i + 1, i, i + 0.5, 1));
+  const y = resample(months, '1Y');
+  assert.equal(y.length, 2); assert.equal(y[0].close, 1.5); assert.equal(y[1].open, 2);
+  assert.equal(bucketKey('2025-03-01', '1Y'), 2025);
+});
+
+test('symbol routing', () => {
+  assert.equal(sourceFor('PAXGUSDT'), 'binance');
+  assert.equal(sourceFor('USDTMXN'), 'binance');
+  assert.equal(sourceFor('XAU/USD'), 'twelvedata');
+  assert.equal(sourceFor('COIN'), 'twelvedata');
+  assert.equal(sourceFor('CRCL'), 'twelvedata');
+});

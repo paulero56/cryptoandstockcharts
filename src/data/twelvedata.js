@@ -32,3 +32,16 @@ export function subscribe(symbol, interval, apiKey, onCandle, everyMs = 60_000) 
   }, everyMs);
   return () => clearInterval(id);
 }
+
+// Latest price + daily % change for several symbols in one request.
+// Each symbol costs 1 API credit, so the app refreshes these slowly.
+export async function fetchQuotes(symbols, apiKey) {
+  if (!symbols.length || !apiKey) return [];
+  const res = await fetch(`${REST}/quote?symbol=${encodeURIComponent(symbols.join(','))}&apikey=${encodeURIComponent(apiKey)}`);
+  const json = await res.json();
+  const map = symbols.length === 1 ? { [symbols[0]]: json } : json;
+  return symbols.flatMap((s) => {
+    const q = map[s];
+    return q && q.close ? [{ symbol: s, last: +q.close, changePct: +q.percent_change }] : [];
+  });
+}

@@ -1,7 +1,8 @@
 import './style.css';
 import { createChart, CrosshairMode, LineStyle, CandlestickSeries, HistogramSeries, LineSeries, createSeriesMarkers } from 'lightweight-charts';
-import { BRAND, DEFAULTS, MOVING_AVERAGES, CROSS, HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BB, BBWP, RSISTD, MACD, WATCHLIST, INTERVALS, INTERVAL_SECONDS } from './config.js';
-import { fetchCandles, subscribe, sourceFor, fetchCryptoTickers } from './data/index.js';
+import { BRAND, DEFAULTS, MOVING_AVERAGES, CROSS, HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BB, BBWP, RSISTD, MACD, WATCHLIST, LABELS, INTERVALS, INTERVAL_SECONDS } from './config.js';
+import { fetchCandles, subscribe, sourceFor, fetchCryptoTickers, fetchMarketQuotes } from './data/index.js';
+import { createDrawingTools } from './drawings.js';
 import { movingAverage } from './indicators/ma.js';
 import { crossovers } from './indicators/cross.js';
 import { computeHpdr } from './indicators/hpdr.js';
@@ -69,6 +70,10 @@ const candleSeries = chart.addSeries(CandlestickSeries, {
   wickUpColor: '#26d07c', wickDownColor: '#ff433d',
 });
 const crossMarkers = createSeriesMarkers(candleSeries, []);
+const drawTools = createDrawingTools({
+  chart, series: candleSeries, toolbar: $('tools'), store, fmt, fmtVol: (v) => fmtVol(v),
+  getCandles: () => state.candles, getStep: () => INTERVAL_SECONDS[state.interval],
+});
 
 const volumeSeries = chart.addSeries(HistogramSeries, { priceScaleId: 'vol', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
 chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
@@ -379,6 +384,7 @@ async function load(symbol, interval) {
   state.symbol = symbol; state.interval = interval;
   store.set('symbol', symbol); store.set('interval', interval);
   renderIntervals(); renderWatch();
+  drawTools.setSymbol(symbol);
   setStatus('', 'LOADING');
   showMsg(`LOADING ${symbol} ${interval}…`);
   try {
@@ -422,23 +428,52 @@ function renderIntervals() {
 }
 $('intervals').addEventListener('click', (e) => { const iv = e.target.dataset.iv; if (iv) load(state.symbol, iv); });
 
-// ── Watchlist ──
+// ── Watchlist (editable, saved in this browser) ──
+state.watch = store.get('watch', WATCHLIST);
 const tickers = {};
-const STOCKS = ['AAPL'];
+const label = (s) => LABELS[s] || s.replace(/USDT$/, '');
+const isCrypto = (s) => sourceFor(s) === 'binance';
+function row(s) {
+  const t = tickers[s];
+  const price = t ? fmt(t.last) : isCrypto(s) ? '…' : (state.apiKey ? '…' : '<span class="dim">F8 KEY</span>');
+  return `<tr data-sym="${s}" class="${s === state.symbol ? 'on' : ''}"><td>${label(s)}</td>`
+    + `<td>${price}</td><td class="${t ? (t.changePct >= 0 ? 'up' : 'down') : ''}">${t ? fmtPct(t.changePct) : ''}</td>`
+    + `<td class="x" data-del="${s}" title="Remove">×</td></tr>`;
+}
 function renderWatch() {
-  $('watch').innerHTML = WATCHLIST.map((s) => {
-    const t = tickers[s];
-    return `<tr data-sym="${s}" class="${s === state.symbol ? 'on' : ''}"><td>${s.replace('USDT', '')}</td>`
-      + `<td>${t ? fmt(t.last) : '…'}</td><td class="${t ? (t.changePct >= 0 ? 'up' : 'down') : ''}">${t ? fmtPct(t.changePct) : ''}</td></tr>`;
-  }).join('');
-  $('watchStocks').innerHTML = STOCKS.map((s) => `<tr data-sym="${s}" class="${s === state.symbol ? 'on' : ''}"><td>${s}</td><td class="dim">CLICK TO LOAD</td></tr>`).join('');
+  $('watch').innerHTML = state.watch.filter(isCrypto).map(row).join('');
+  $('watchStocks').innerHTML = state.watch.filter((s) => !isCrypto(s)).map(row).join('');
 }
 async function refreshTickers() {
-  try { for (const t of await fetchCryptoTickers(WATCHLIST)) tickers[t.symbol] = t; renderWatch(); } catch { /* offline */ }
+  const list = state.watch.filter(isCrypto);
+  if (!list.length) return;
+  try { for (const t of await fetchCryptoTickers(list)) tickers[t.symbol] = t; renderWatch(); } catch { /* offline */ }
 }
+async function refreshQuotes() {
+  const list = state.watch.filter((s) => !isCrypto(s));
+  try { for (const t of await fetchMarketQuotes(list, state.apiKey)) tickers[t.symbol] = t; renderWatch(); } catch { /* no key / limit */ }
+}
+function saveWatch() { store.set('watch', state.watch); renderWatch(); }
+async function addSymbol(raw) {
+  const s = raw.toUpperCase().replace(/[^A-Z0-9.:/]/g, '');
+  if (!s || state.watch.includes(s)) return;
+  try {
+    await fetchCandles(s, '1D', { apiKey: state.apiKey }); // validate before adding
+    state.watch.push(s); saveWatch();
+    isCrypto(s) ? refreshTickers() : refreshQuotes();
+  } catch (err) {
+    showMsg(`CAN'T ADD ${s}: ${err.message}`); setTimeout(() => showMsg(''), 3500);
+  }
+}
+function removeSymbol(s) { state.watch = state.watch.filter((x) => x !== s); delete tickers[s]; saveWatch(); }
 for (const id of ['watch', 'watchStocks']) {
-  $(id).addEventListener('click', (e) => { const s = e.target.closest('tr')?.dataset.sym; if (s) load(s, state.interval); });
+  $(id).addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del]')?.dataset.del;
+    if (del) return removeSymbol(del);
+    const s = e.target.closest('tr')?.dataset.sym; if (s) load(s, state.interval);
+  });
 }
+$('addForm').addEventListener('submit', (e) => { e.preventDefault(); addSymbol($('addInput').value); $('addInput').value = ''; $('addInput').blur(); });
 
 // ── Command line ──
 function parseInterval(tok) {
@@ -447,7 +482,8 @@ function parseInterval(tok) {
   if (up === '1MO' || up === 'MONTHLY') return '1M';
   if (up === 'DAILY') return '1D';
   if (up === 'WEEKLY') return '1W';
-  if (/^\d+[DHW]$/.test(up) && INTERVALS.includes(up)) return up;
+  if (up === 'YEARLY' || up === '12M') return '1Y';
+  if (/^\d+[DHWY]$/.test(up) && INTERVALS.includes(up)) return up;
   if (/^\d+M$/.test(tok) && INTERVALS.includes(tok.toLowerCase())) return tok.toLowerCase();
   return null;
 }
@@ -460,6 +496,8 @@ $('cmdForm').addEventListener('submit', (e) => {
   const toks = raw.split(/\s+/);
   const head = toks[0].toUpperCase();
   if (head === 'HELP') return openHelp();
+  if (head === 'ADD' && toks[1]) return addSymbol(toks[1]);
+  if ((head === 'DEL' || head === 'REMOVE') && toks[1]) return removeSymbol(toks[1].toUpperCase());
   if (head === 'KEY') { state.apiKey = toks[1] || ''; store.set('apiKey', state.apiKey); return load(state.symbol, state.interval); }
   const STUDY_CMDS = { BB: 'bb', BBWP: 'bbwp', MACD: 'macd', RSIDIV: 'rsi', HPDR: 'hpdr', HPDRO: 'hpdro', HPDRV: 'hpdrv', STOCH: 'stoch', RSI: 'rsistd', JEWEL: 'jewel', FIB: 'jewel', CROSS: 'cross' };
   if (STUDY_CMDS[head] && toks.length === 1) return toggle(STUDY_CMDS[head]);
@@ -491,6 +529,9 @@ function openHelp() {
       <tr><td><code>AAPL 1W</code></td><td>Stocks via Twelve Data (needs key, F8)</td></tr>
       <tr><td><code>HPDR</code> <code>HPDRO</code> <code>HPDRV</code></td><td>Toggle HPDR bands / oscillator / volatility</td></tr>
       <tr><td><code>STOCH</code> <code>RSI</code> <code>JEWEL</code></td><td>Toggle Advanced Stoch / RSI divergence / Jewel~ + AutoFib</td></tr>
+      <tr><td><code>ADD PEPEUSDT</code> <code>DEL COIN</code></td><td>Add / remove a watchlist symbol (or use the box under the watchlist)</td></tr>
+      <tr><td><code>2W</code> <code>1Y</code></td><td>2-week and yearly candles (built from weekly / monthly data)</td></tr>
+      <tr><td><b>T</b> / <b>H</b> / <b>M</b></td><td>Draw a trend line / horizontal line / measure box. <b>Shift + click</b> = quick measure. Click a drawing + <b>Delete</b> to remove it.</td></tr>
       <tr><td><code>KEY abc123</code></td><td>Set your Twelve Data API key</td></tr>
     </table>
     <div class="dim">Crypto pairs ending in USDT / USDC / BTC… load from Binance (live). Everything else loads from Twelve Data (polled every 60s).<br>
@@ -508,6 +549,7 @@ function openSettings() {
     state.apiKey = $('keyInput').value.trim();
     store.set('apiKey', state.apiKey);
     closeModal();
+    refreshQuotes();
     if (sourceFor(state.symbol) !== 'binance') load(state.symbol, state.interval);
   };
 }
@@ -542,4 +584,6 @@ renderIntervals();
 renderWatch();
 refreshTickers();
 setInterval(refreshTickers, 10_000);
+refreshQuotes();
+setInterval(refreshQuotes, 120_000); // Twelve Data free plan: ~800 credits/day
 load(state.symbol, state.interval);

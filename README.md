@@ -7,6 +7,9 @@ A Bloomberg-style charting terminal built with open-source tools. It looks and w
 - **Stocks:** [Twelve Data](https://twelvedata.com), free API key, refreshed every 60 s
 - **Overlays:** EMA 5/9/21/34/55/100/200, SMA 9/100/200, SMA 9 × SMA 200 crossover signals, Bollinger Bands 20/2, HPDR Bands with coloured fills, range scale and forward projection, AutoFib
 - **Panes:** BBWP (13/252, SMA 5, 98/2 extremes), RSI 14 + SMA 14 with 30–70 zone, MACD 12/26/9, HPDRO, HPDRV, Advanced Stoch (forecast + stochastic volatility), RSI divergence (Cutler RSI, pivots, regular + hidden), Jewel~
+- **Drawing tools:** trend line (shows % and bars), horizontal line (shows % from price), measure box (change, %, bars, time, volume — like TradingView). Saved per symbol.
+- **Timeframes:** 1m 5m 15m 1H 4H 1D 1W **2W** 1M **1Y** (2W and 1Y are built from weekly / monthly candles)
+- **Watchlist:** add/remove any symbol; defaults include altcoins, gold (PAXGUSDT, live), USD/MXN (USDTMXN, live), Coinbase (COIN), Circle (CRCL), gold spot (XAU/USD) and USD/MXN forex
 - **Terminal UI:** command line, function keys, watchlist, signals panel
 
 ## Run it
@@ -30,6 +33,8 @@ Deploy to Netlify by connecting the repo. `netlify.toml` is already set up.
 | `HPDR` `HPDRO` `HPDRV` | Toggle HPDR bands / oscillator / volatility |
 | `BB` `BBWP` `RSI` `MACD` | Toggle Bollinger / BBWP / RSI / MACD |
 | `STOCH` `RSIDIV` `JEWEL` | Toggle Advanced Stoch / RSI divergence / Jewel~ + AutoFib |
+| `ADD PEPEUSDT` / `DEL COIN` | Add / remove a watchlist symbol (or use the box under the watchlist) |
+| **T** / **H** / **M** | Trend line / horizontal line / measure. **Shift + click** = quick measure. Click a drawing, then **Delete** |
 | `/` or **F2** | Focus the command line |
 | **F1** | Help |
 | **F3** | Studies |

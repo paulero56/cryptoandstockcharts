@@ -123,3 +123,25 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 .pane-legend { position: absolute; z-index: 3; left: 10px; pointer-events: none; font-size: 11px; background: rgba(0,0,0,.6); padding: 0 6px; white-space: nowrap; max-width: calc(100% - 90px); overflow: hidden; text-overflow: ellipsis; }
 .pane-legend b { color: var(--amber); font-weight: 600; margin-right: 4px; }
+
+/* ── Drawing toolbar ── */
+.tools { position: absolute; z-index: 5; left: 0; top: 0; bottom: 0; width: 34px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 6px; border-right: 1px solid var(--line-2); background: #050505; }
+.tools button { width: 26px; height: 26px; display: grid; place-items: center; color: var(--dim); border: 1px solid transparent; }
+.tools button svg { width: 15px; height: 15px; }
+.tools button:hover { color: var(--text); border-color: var(--line-2); }
+.tools button.on { color: #000; background: var(--amber); }
+.tools-sep { width: 18px; border-top: 1px solid var(--line-2); margin: 2px 0; }
+#chart { left: 35px; }
+.legend, .pane-legend { left: 45px; }
+
+/* ── Watchlist add/remove ── */
+.watch td.x { width: 18px; padding: 0 6px 0 0; text-align: center; color: transparent; }
+.watch tr:hover td.x { color: var(--dim); }
+.watch td.x:hover { color: var(--down) !important; }
+.watch .sub { color: var(--dim); font-size: 10px; margin-left: 4px; }
+.add { display: flex; margin: 6px 10px 2px; border: 1px solid var(--line-2); }
+.add:focus-within { border-color: var(--amber); }
+.add input { flex: 1; min-width: 0; background: #000; border: 0; outline: 0; color: var(--amber); font: 12px var(--font); padding: 4px 6px; text-transform: uppercase; }
+.add input::placeholder { color: #4a4a4a; text-transform: none; }
+.add button { background: #1a1a1a; color: var(--amber); font-weight: 700; padding: 0 8px; }
+.intervals { flex-wrap: wrap; }

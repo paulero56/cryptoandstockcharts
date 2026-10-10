@@ -38,6 +38,14 @@
     <!-- ── Main: chart + side panels ── -->
     <main class="main">
       <section class="chart-wrap">
+        <div class="tools" id="tools">
+          <button data-tool="cursor" class="on" title="Cursor — click a drawing to select it (Esc)"><svg viewBox="0 0 16 16"><path d="M3 2l9 5-4 1-2 4z" fill="currentColor"/></svg></button>
+          <button data-tool="trend" title="Trend line with % (T)"><svg viewBox="0 0 16 16"><path d="M2 13L14 3" stroke="currentColor" stroke-width="1.6"/><circle cx="2.5" cy="12.5" r="1.6" fill="currentColor"/><circle cx="13.5" cy="3.5" r="1.6" fill="currentColor"/></svg></button>
+          <button data-tool="hline" title="Horizontal line (H)"><svg viewBox="0 0 16 16"><path d="M1 8h14" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 2"/></svg></button>
+          <button data-tool="measure" title="Measure % up / down (M, or Shift + click)"><svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 4v8M5 9l3 3 3-3" stroke="currentColor" stroke-width="1.3" fill="none"/></svg></button>
+          <span class="tools-sep"></span>
+          <button data-act="clear" title="Delete all drawings on this symbol"><svg viewBox="0 0 16 16"><path d="M3 4h10M6 4V2.5h4V4M4.5 4l.7 9.5h5.6L11.5 4" stroke="currentColor" stroke-width="1.3" fill="none"/></svg></button>
+        </div>
         <div class="legend" id="legend"></div>
         <div id="chart"></div>
         <div id="paneLegends"></div>
@@ -48,8 +56,9 @@
         <div class="panel">
           <div class="panel-h">WATCHLIST <span class="dim">CRYPTO · LIVE</span></div>
           <table class="watch" id="watch"></table>
-          <div class="panel-h sub">STOCKS <span class="dim">TWELVE DATA</span></div>
+          <div class="panel-h sub">MARKETS <span class="dim" id="mktNote">TWELVE DATA</span></div>
           <table class="watch" id="watchStocks"></table>
+          <form class="add" id="addForm" autocomplete="off"><input id="addInput" spellcheck="false" placeholder="+ ADD  e.g. PEPEUSDT, NVDA, EUR/USD" /><button>ADD</button></form>
         </div>
         <div class="panel">
           <div class="panel-h">STUDIES <span class="dim">F3</span></div>
