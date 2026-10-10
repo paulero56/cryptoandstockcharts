@@ -2,7 +2,8 @@
 // Each study: { id, title, create(chart, paneIndex, ctx) → handle }
 // handle: { update(data), legend(i) → html, destroy() }
 import { LineSeries, HistogramSeries, LineStyle, createSeriesMarkers } from 'lightweight-charts';
-import { HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL } from './config.js';
+import { HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BBWP, RSISTD, MACD } from './config.js';
+import { BandFill } from './primitives/bandFill.js';
 
 export const hexA = (hex, a) => {
   const n = parseInt(hex.slice(1), 16);
@@ -219,4 +220,97 @@ export const JEWEL_STUDY = {
   },
 };
 
-export const PANE_STUDIES = [HPDRO_STUDY, HPDRV_STUDY, STOCH_STUDY, RSI_STUDY, JEWEL_STUDY];
+
+// ── BBWP ──
+export const BBWP_STUDY = {
+  id: 'bbwp', title: 'BBWP',
+  create(chart, pane) {
+    const bars = chart.addSeries(HistogramSeries, { priceScaleId: 'bbwp-x', lastValueVisible: false, priceLineVisible: false, base: 0 }, pane);
+    bars.priceScale().applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
+    const line = addLine(chart, pane, { lineWidth: 2, autoscaleInfoProvider: fixed(0, 100), lastValueVisible: true });
+    const ma = addLine(chart, pane, { color: BBWP.ma.color, lineWidth: 1, autoscaleInfoProvider: fixed(0, 100) });
+    guides(line, [[100, 'rgba(232,57,44,.8)', LineStyle.Solid], [BBWP.extremeHigh, 'rgba(232,57,44,.35)'], [50, 'rgba(255,255,255,.25)'], [BBWP.extremeLow, 'rgba(41,80,255,.5)'], [0, 'rgba(41,80,255,.8)', LineStyle.Solid]]);
+    let b = null;
+    return {
+      series: [bars, line, ma],
+      update(d) {
+        b = d.bbwp;
+        line.setData(toLine(b.value, d.times, (v) => ramp(v)));
+        ma.setData(BBWP.ma.on ? toLine(b.ma, d.times) : []);
+        const out = [];
+        b.value.forEach((v, i) => {
+          if (v == null) return;
+          if (v >= BBWP.extremeHigh) out.push({ time: d.times[i], value: 1, color: 'rgba(232,57,44,.85)' });
+          else if (v <= BBWP.extremeLow) out.push({ time: d.times[i], value: 1, color: 'rgba(41,80,255,.85)' });
+        });
+        bars.setData(out);
+      },
+      legend(i) {
+        const v = b?.value[i];
+        return `<b>BBWP</b> ${BBWP.length} ${BBWP.lookback} <span style="color:${v == null ? '#777' : ramp(v)}">${fmt(v, 2)}%</span>`
+          + (BBWP.ma.on ? ` <span style="color:${BBWP.ma.color}">${BBWP.ma.type}${BBWP.ma.length} ${fmt(b?.ma[i], 2)}%</span>` : '');
+      },
+      destroy() { for (const x of [bars, line, ma]) chart.removeSeries(x); },
+    };
+  },
+};
+
+// ── RSI (standard) ──
+export const RSISTD_STUDY = {
+  id: 'rsistd', title: 'RSI',
+  create(chart, pane) {
+    const c = RSISTD.colors;
+    const line = addLine(chart, pane, { color: c.rsi, lineWidth: 2, autoscaleInfoProvider: fixed(20, 80), lastValueVisible: true });
+    const ma = addLine(chart, pane, { color: c.ma, lineWidth: 1, autoscaleInfoProvider: fixed(20, 80), lastValueVisible: true });
+    guides(line, [[70, 'rgba(255,255,255,.3)', LineStyle.Dashed], [50, 'rgba(255,255,255,.15)', LineStyle.Dashed], [30, 'rgba(255,255,255,.3)', LineStyle.Dashed]]);
+    const zone = new BandFill();
+    line.attachPrimitive(zone);
+    let r = null;
+    return {
+      series: [line, ma],
+      update(d) {
+        r = d.rsistd;
+        line.setData(toLine(r.rsi, d.times));
+        ma.setData(toLine(r.ma, d.times));
+        zone.setData(d.times, [{ color: c.zone, upper: d.times.map(() => 70), lower: d.times.map(() => 30) }]);
+      },
+      legend(i) {
+        return `<b>RSI</b> ${RSISTD.length} <span style="color:${c.rsi}">${fmt(r?.rsi[i], 2)}</span> <span style="color:${c.ma}">${RSISTD.ma.type}${RSISTD.ma.length} ${fmt(r?.ma[i], 2)}</span>`;
+      },
+      destroy() { line.detachPrimitive(zone); chart.removeSeries(line); chart.removeSeries(ma); },
+    };
+  },
+};
+
+// ── MACD ──
+export const MACD_STUDY = {
+  id: 'macd', title: 'MACD',
+  create(chart, pane) {
+    const c = MACD.colors;
+    const hist = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: true, priceFormat: { type: 'price', precision: 4, minMove: 0.0001 } }, pane);
+    const line = addLine(chart, pane, { color: c.macd, lineWidth: 1, lastValueVisible: true });
+    const sig = addLine(chart, pane, { color: c.signal, lineWidth: 1, lastValueVisible: true });
+    let m = null;
+    return {
+      series: [hist, line, sig],
+      update(d) {
+        m = d.macd;
+        hist.setData(toLine(m.hist, d.times, (v, i) => {
+          const prev = m.hist[i - 1] ?? v;
+          return v >= 0 ? (v >= prev ? c.upStrong : c.upWeak) : (v <= prev ? c.downStrong : c.downWeak);
+        }));
+        line.setData(toLine(m.macd, d.times));
+        sig.setData(toLine(m.signal, d.times));
+      },
+      legend(i) {
+        const f = (v) => (v == null ? '—' : Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(4));
+        const h = m?.hist[i];
+        return `<b>MACD</b> ${MACD.fast} ${MACD.slow} ${MACD.signal} <span style="color:${h >= 0 ? c.upStrong : c.downStrong}">${f(h)}</span>`
+          + ` <span style="color:${c.macd}">${f(m?.macd[i])}</span> <span style="color:${c.signal}">${f(m?.signal[i])}</span>`;
+      },
+      destroy() { for (const x of [hist, line, sig]) chart.removeSeries(x); },
+    };
+  },
+};
+
+export const PANE_STUDIES = [BBWP_STUDY, RSISTD_STUDY, MACD_STUDY, HPDRO_STUDY, HPDRV_STUDY, STOCH_STUDY, RSI_STUDY, JEWEL_STUDY];

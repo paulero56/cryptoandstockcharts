@@ -88,3 +88,23 @@ test('smaN skips leading nulls; autoFib endpoints; stochVol range', () => {
   assert.equal(f[0].price, 10); assert.equal(f.at(-1).price, 0);
   for (const v of stochVolatility(close(300), { lookback: 100 })) if (v != null) assert.ok(v >= 0 && v <= 100);
 });
+
+import { bollinger, bbwp, macd } from '../src/indicators/oscillators.js';
+
+test('Bollinger: flat series → bands collapse onto basis', () => {
+  const b = bollinger(new Array(30).fill(5), 20, 2);
+  assert.equal(b.upper.at(-1), 5); assert.equal(b.lower.at(-1), 5);
+});
+
+test('BBWP stays 0–100 and reaches 100 on the widest bar', () => {
+  const v = [...close(300), ...Array.from({ length: 20 }, (_, i) => 200 + (i % 2 ? 40 : -40))];
+  const r = bbwp(v, { length: 13, lookback: 252 });
+  for (const x of r) if (x != null) assert.ok(x >= 0 && x <= 100);
+  assert.ok(Math.max(...r.filter(x => x != null)) === 100);
+});
+
+test('MACD hist = macd − signal', () => {
+  const m = macd(close(200));
+  const i = 199;
+  assert.ok(Math.abs(m.hist[i] - (m.macd[i] - m.signal[i])) < 1e-9);
+});

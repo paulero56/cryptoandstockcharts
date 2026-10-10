@@ -1,11 +1,12 @@
 import './style.css';
 import { createChart, CrosshairMode, LineStyle, CandlestickSeries, HistogramSeries, LineSeries, createSeriesMarkers } from 'lightweight-charts';
-import { BRAND, DEFAULTS, MOVING_AVERAGES, CROSS, HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, WATCHLIST, INTERVALS, INTERVAL_SECONDS } from './config.js';
+import { BRAND, DEFAULTS, MOVING_AVERAGES, CROSS, HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BB, BBWP, RSISTD, MACD, WATCHLIST, INTERVALS, INTERVAL_SECONDS } from './config.js';
 import { fetchCandles, subscribe, sourceFor, fetchCryptoTickers } from './data/index.js';
 import { movingAverage } from './indicators/ma.js';
 import { crossovers } from './indicators/cross.js';
 import { computeHpdr } from './indicators/hpdr.js';
-import { stochastic, forecast, stochVolatility, rsi, divergences, dmi, autoFib, smaN, emaN } from './indicators/oscillators.js';
+import { stochastic, forecast, stochVolatility, rsi, divergences, dmi, autoFib, smaN, emaN, bollinger, bbwp, macd } from './indicators/oscillators.js';
+import { BandFill } from './primitives/bandFill.js';
 import { PANE_STUDIES, toLine, hexA } from './studies.js';
 
 const $ = (id) => document.getElementById(id);
@@ -24,6 +25,7 @@ const state = {
   on: {
     cross: CROSS.enabled, hpdr: HPDR.enabled, hpdrProject: HPDR.project, hpdro: HPDRO.enabled, hpdrv: HPDRV.enabled,
     stoch: STOCH.enabled, rsi: RSIDIV.enabled, jewel: JEWEL.enabled,
+    bb: BB.enabled, bbwp: BBWP.enabled, rsistd: RSISTD.enabled, macd: MACD.enabled,
     ...store.get('on', {}),
   },
   candles: [],
@@ -81,6 +83,19 @@ const hpdrSeries = {
   upper: Object.fromEntries(HPDR.ranges.map((r) => [r.p, overlayLine({ color: hexA(r.color, HPDR.lineAlpha) })])),
   lower: Object.fromEntries(HPDR.ranges.map((r) => [r.p, overlayLine({ color: hexA(r.color, HPDR.lineAlpha) })])),
 };
+
+// HPDR fills + range scale, drawn under everything on the price pane.
+const hpdrFill = new BandFill();
+candleSeries.attachPrimitive(hpdrFill);
+
+// Bollinger Bands
+const bbSeries = {
+  basis: overlayLine({ color: hexA(BB.color, 0.8) }),
+  upper: overlayLine({ color: hexA(BB.color, 0.6) }),
+  lower: overlayLine({ color: hexA(BB.color, 0.6) }),
+};
+const bbFill = new BandFill();
+bbSeries.upper.attachPrimitive(bbFill);
 
 // ── Pane studies (HPDRO, HPDRV, Stoch, RSI, Jewel) ──
 let paneHandles = []; // [{study, handle}]
@@ -142,6 +157,16 @@ function compute() {
     const src = HPDR.source === 'close' ? close : c.map((x) => (x.high + x.low + x.close) / 3);
     d.hpdr = computeHpdr(src, { length: HPDR.length, maxArray: HPDR.maxArray, ranges: HPDR.ranges.map((r) => r.p), project: state.on.hpdrProject });
   }
+  if (state.on.bb) d.bb = bollinger(close, BB.length, BB.mult, BB.basisType);
+  if (state.on.bbwp) {
+    const v = bbwp(close, BBWP);
+    d.bbwp = { value: v, ma: d.maOf(v, BBWP.ma) };
+  }
+  if (state.on.rsistd) {
+    const r = rsi(close, RSISTD.length, 'wilder');
+    d.rsistd = { rsi: r, ma: d.maOf(r, RSISTD.ma) };
+  }
+  if (state.on.macd) d.macd = macd(close, MACD.fast, MACD.slow, MACD.signal);
   if (state.on.stoch) {
     const s = stochastic({ high, low, close }, STOCH);
     d.stoch = { ...s, fk: forecast(s.k, STOCH.forecastBars), fd: forecast(s.d, STOCH.forecastBars), vol: stochVolatility(close, STOCH.volatility) };
@@ -190,6 +215,35 @@ function draw() {
     setOverlay(hpdrSeries.upper[r.p], h?.upper[r.p] ?? [], state.on.hpdr, proj(h?.projection?.upper[r.p] ?? []));
     setOverlay(hpdrSeries.lower[r.p], h?.lower[r.p] ?? [], state.on.hpdr, proj(h?.projection?.lower[r.p] ?? []));
   }
+
+  // HPDR fills between consecutive ranges + range scale labels
+  if (state.on.hpdr && h && (HPDR.fill || HPDR.scale)) {
+    const pt = (arr, projArr) => [...arr, ...(h.projection && fut ? projArr : [])];
+    const allTimes = [...computed.times, ...(h.projection && fut ? fut : [])];
+    const bands = [];
+    if (HPDR.fill) {
+      HPDR.ranges.forEach((r, k) => {
+        const up = pt(h.upper[r.p], h.projection?.upper[r.p] ?? []), lo = pt(h.lower[r.p], h.projection?.lower[r.p] ?? []);
+        const color = hexA(r.color, HPDR.fillAlpha);
+        if (k === 0) bands.push({ color, upper: up, lower: lo });
+        else {
+          const prev = HPDR.ranges[k - 1];
+          bands.push({ color, upper: up, lower: pt(h.upper[prev.p], h.projection?.upper[prev.p] ?? []) });
+          bands.push({ color, upper: pt(h.lower[prev.p], h.projection?.lower[prev.p] ?? []), lower: lo });
+        }
+      });
+    }
+    const i = h.median.length - 1;
+    const labels = HPDR.scale ? [...HPDR.ranges].reverse().flatMap((r) => [
+      { price: h.upper[r.p][i], text: `${r.p} %`, color: r.color },
+      { price: h.lower[r.p][i], text: `${r.p} %`, color: r.color },
+    ]).filter((x) => x.price != null) : [];
+    hpdrFill.setData(allTimes, bands, labels);
+  } else hpdrFill.setData([], []);
+
+  // Bollinger
+  for (const k of ['basis', 'upper', 'lower']) setOverlay(bbSeries[k], computed.bb?.[k] ?? [], state.on.bb);
+  bbFill.setData(state.on.bb ? computed.times : [], state.on.bb ? [{ color: hexA(BB.color, BB.fillAlpha), upper: computed.bb.upper, lower: computed.bb.lower }] : []);
 
   crossMarkers.setMarkers(state.on.cross ? computed.signals.map((s) => ({
     time: computed.times[s.index],
@@ -269,10 +323,14 @@ const TOGGLES = [
   { key: 'cross', label: 'CROSS SIGNALS', color: '#26d07c' },
   { key: 'hpdr', label: 'HPDR BANDS', color: '#6ef5ff' },
   { key: 'hpdrProject', label: '└ PROJECT FWD', color: '#6ef5ff' },
+  { key: 'bb', label: `BB ${BB.length} ${BB.mult}`, color: BB.color },
+  { key: 'bbwp', label: 'BBWP', color: '#e8392c', pane: true },
+  { key: 'rsistd', label: 'RSI', color: '#7e57c2', pane: true },
+  { key: 'macd', label: 'MACD', color: '#2962ff', pane: true },
   { key: 'hpdro', label: 'HPDRO', color: '#e84a4a', pane: true },
   { key: 'hpdrv', label: 'HPDRV', color: '#ffffff', pane: true },
   { key: 'stoch', label: 'ADV STOCH', color: '#00d7ff', pane: true },
-  { key: 'rsi', label: 'RSI DIVERGENCE', color: '#7dff4f', pane: true },
+  { key: 'rsi', label: 'RSI DIV (CUTLER)', color: '#7dff4f', pane: true },
   { key: 'jewel', label: 'JEWEL~ (+AUTOFIB)', color: '#ffa028', pane: true },
 ];
 
@@ -403,7 +461,7 @@ $('cmdForm').addEventListener('submit', (e) => {
   const head = toks[0].toUpperCase();
   if (head === 'HELP') return openHelp();
   if (head === 'KEY') { state.apiKey = toks[1] || ''; store.set('apiKey', state.apiKey); return load(state.symbol, state.interval); }
-  const STUDY_CMDS = { HPDR: 'hpdr', HPDRO: 'hpdro', HPDRV: 'hpdrv', STOCH: 'stoch', RSI: 'rsi', JEWEL: 'jewel', FIB: 'jewel', CROSS: 'cross' };
+  const STUDY_CMDS = { BB: 'bb', BBWP: 'bbwp', MACD: 'macd', RSIDIV: 'rsi', HPDR: 'hpdr', HPDRO: 'hpdro', HPDRV: 'hpdrv', STOCH: 'stoch', RSI: 'rsistd', JEWEL: 'jewel', FIB: 'jewel', CROSS: 'cross' };
   if (STUDY_CMDS[head] && toks.length === 1) return toggle(STUDY_CMDS[head]);
   let symbol = state.symbol, interval = state.interval;
   for (const t of toks) {

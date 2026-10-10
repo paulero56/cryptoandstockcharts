@@ -14,14 +14,23 @@ export const DEFAULTS = {
 
 // Moving averages drawn on the price chart. Add / remove freely.
 export const MOVING_AVERAGES = [
-  { id: 'sma9',   type: 'SMA', length: 9,   color: '#00d7ff', visible: true },
-  { id: 'ema21',  type: 'EMA', length: 21,  color: '#c77dff', visible: false },
-  { id: 'ema55',  type: 'EMA', length: 55,  color: '#f5e663', visible: false },
-  { id: 'sma200', type: 'SMA', length: 200, color: '#ffa028', visible: true },
+  { id: 'sma9',   type: 'SMA', length: 9,   color: '#00d7ff', visible: false },
+  { id: 'ema5',   type: 'EMA', length: 5,   color: '#ef9a9a', visible: false },
+  { id: 'ema9',   type: 'EMA', length: 9,   color: '#448aff', visible: true },
+  { id: 'ema21',  type: 'EMA', length: 21,  color: '#9575cd', visible: true },
+  { id: 'ema34',  type: 'EMA', length: 34,  color: '#f48fb1', visible: true },
+  { id: 'ema55',  type: 'EMA', length: 55,  color: '#f5e663', visible: true },
+  { id: 'ema100', type: 'EMA', length: 100, color: '#81c784', visible: true },
+  { id: 'sma100', type: 'SMA', length: 100, color: '#4db6ac', visible: false },
+  { id: 'ema200', type: 'EMA', length: 200, color: '#ff8a65', visible: false },
+  { id: 'sma200', type: 'SMA', length: 200, color: '#ffffff', visible: true },
 ];
 
+// Bollinger Bands overlay ("BB 20 SMA close 2")
+export const BB = { enabled: false, length: 20, mult: 2, basisType: 'SMA', color: '#2196f3', fillAlpha: 0.06 };
+
 // Crossover signals: fast MA crossing slow MA (only on CLOSED candles).
-export const CROSS = { fast: 'sma9', slow: 'sma200', enabled: true };
+export const CROSS = { fast: 'sma9', slow: 'sma200', enabled: true }; // SMA 9 is computed even when hidden
 
 // ── HPDR family (Historical Price Delta Range) — see src/indicators/hpdr.js ──
 export const HPDR = {
@@ -31,6 +40,9 @@ export const HPDR = {
   maxArray: 100000,     // "Max Array Size"
   project: false,       // "Project Bands Forward"
   lineAlpha: 0.6,       // "Line Transparency 40"
+  fill: true,           // "Linefill On"
+  fillAlpha: 0.10,      // "Fill Transparency 90"
+  scale: true,          // "Scale On" + "Text On": range labels right of the last bar
   median: '#ffffff',
   ranges: [
     { p: 38.2, color: '#2950ff' },
@@ -43,12 +55,26 @@ export const HPDR = {
     { p: 100,  color: '#e8392c' },
   ],
 };
-export const HPDRO = { enabled: true,  lineWidth: 2, ma: { on: true, type: 'SMA', length: 5, color: '#e84a4a', width: 2 }, alerts: true };
+export const HPDRO = { enabled: false,  lineWidth: 2, ma: { on: true, type: 'SMA', length: 5, color: '#e84a4a', width: 2 }, alerts: true };
 export const HPDRV = { enabled: false, lineWidth: 2, ma: { on: true, type: 'SMA', length: 5, color: '#ffffff', width: 2 } };
+
+// ── BBWP — Bollinger Band Width Percentile ("BBWP close SMA 13 252 … SMA 5 98 2") ──
+export const BBWP = {
+  enabled: true,
+  length: 13, basisType: 'SMA', lookback: 252,
+  ma: { on: true, type: 'SMA', length: 5, color: '#ffffff' },
+  extremeHigh: 98, extremeLow: 2,   // red / blue bars when reached
+};
+
+// ── RSI (standard Wilder) with MA and 30–70 zone ──
+export const RSISTD = { enabled: true, length: 14, ma: { type: 'SMA', length: 14 }, colors: { rsi: '#7e57c2', ma: '#f2c14e', zone: 'rgba(126,87,194,.10)' } };
+
+// ── MACD ──
+export const MACD = { enabled: true, fast: 12, slow: 26, signal: 9, colors: { macd: '#2962ff', signal: '#ff6d00', upStrong: '#26a69a', upWeak: '#b2dfdb', downStrong: '#ff5252', downWeak: '#ffcdd2' } };
 
 // ── Advanced Stoch ──
 export const STOCH = {
-  enabled: true,
+  enabled: false,
   k: 14, d: 3, smooth: 6,
   forecastK: true, forecastD: true, forecastBars: 3,
   volatility: { enabled: true, lookback: 255, smooth: 3 },
@@ -57,7 +83,7 @@ export const STOCH = {
 
 // ── RSI divergence ──
 export const RSIDIV = {
-  enabled: true,
+  enabled: false,
   length: 14, type: 'cutler',          // 'cutler' (SMA) or 'wilder' (RMA)
   signal: 12, signalType: 'SMA',
   pivots: true, left: 5, right: 3,     // pivot confirmation bars

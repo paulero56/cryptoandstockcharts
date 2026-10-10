@@ -178,3 +178,46 @@ export function autoFib({ high, low }, lookback = 200, levels = [0, 0.236, 0.382
   const upTrend = loI < hiI; // swing went low → high: retracements measured down from the high
   return levels.map((l) => ({ level: l, price: upTrend ? hi - (hi - lo) * l : lo + (hi - lo) * l }));
 }
+
+// ── Bollinger Bands (population stdev, like TradingView) ──
+export function bollinger(values, length = 20, mult = 2, basisType = 'SMA') {
+  const basis = basisType === 'EMA' ? emaN(values, length) : smaN(values, length);
+  const upper = new Array(values.length).fill(null), lower = new Array(values.length).fill(null);
+  for (let i = length - 1; i < values.length; i++) {
+    if (basis[i] == null) continue;
+    let s = 0;
+    for (let j = i - length + 1; j <= i; j++) s += (values[j] - basis[i]) ** 2;
+    const sd = Math.sqrt(s / length);
+    upper[i] = basis[i] + mult * sd; lower[i] = basis[i] - mult * sd;
+  }
+  return { basis, upper, lower };
+}
+
+// ── BBWP: Bollinger Band Width Percentile ──
+// Width = (upper − lower) / basis. BBWP = % of the last `lookback` widths
+// that are ≤ the current width (0 = tightest squeeze, 100 = widest).
+export function bbwp(values, { length = 13, mult = 1, basisType = 'SMA', lookback = 252 } = {}) {
+  const bb = bollinger(values, length, mult, basisType);
+  const width = bb.basis.map((b, i) => (b == null || b === 0 ? null : (bb.upper[i] - bb.lower[i]) / b));
+  const out = new Array(values.length).fill(null);
+  for (let i = 0; i < values.length; i++) {
+    if (width[i] == null) continue;
+    let count = 0, total = 0;
+    for (let j = Math.max(0, i - lookback); j < i; j++) {
+      if (width[j] == null) continue;
+      total++;
+      if (width[j] <= width[i]) count++;
+    }
+    if (total >= Math.min(lookback, 20)) out[i] = (count / total) * 100;
+  }
+  return out;
+}
+
+// ── MACD ──
+export function macd(values, fast = 12, slow = 26, signal = 9) {
+  const f = ema(values, fast), s = ema(values, slow);
+  const line = f.map((v, i) => (v == null || s[i] == null ? null : v - s[i]));
+  const sig = emaN(line, signal);
+  const hist = line.map((v, i) => (v == null || sig[i] == null ? null : v - sig[i]));
+  return { macd: line, signal: sig, hist };
+}

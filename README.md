@@ -5,8 +5,8 @@ A Bloomberg-style charting terminal built with open-source tools. It looks and w
 - **Charts:** [TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts) (Apache-2.0)
 - **Crypto:** Binance public market data, real time over WebSocket, no API key needed
 - **Stocks:** [Twelve Data](https://twelvedata.com), free API key, refreshed every 60 s
-- **Overlays:** SMA / EMA (SMA 9 and SMA 200 on by default), SMA 9 × SMA 200 crossover signals, HPDR Bands (+ forward projection), AutoFib
-- **Panes:** HPDRO, HPDRV, Advanced Stoch (forecast + stochastic volatility), RSI divergence (Cutler RSI, pivots, regular + hidden), Jewel~
+- **Overlays:** EMA 5/9/21/34/55/100/200, SMA 9/100/200, SMA 9 × SMA 200 crossover signals, Bollinger Bands 20/2, HPDR Bands with coloured fills, range scale and forward projection, AutoFib
+- **Panes:** BBWP (13/252, SMA 5, 98/2 extremes), RSI 14 + SMA 14 with 30–70 zone, MACD 12/26/9, HPDRO, HPDRV, Advanced Stoch (forecast + stochastic volatility), RSI divergence (Cutler RSI, pivots, regular + hidden), Jewel~
 - **Terminal UI:** command line, function keys, watchlist, signals panel
 
 ## Run it
@@ -28,7 +28,8 @@ Deploy to Netlify by connecting the repo. `netlify.toml` is already set up.
 | `4H` | Change only the timeframe (`1m` = minute, `1M` = month) |
 | `AAPL 1W` | Load a stock (needs a Twelve Data key: press **F8**) |
 | `HPDR` `HPDRO` `HPDRV` | Toggle HPDR bands / oscillator / volatility |
-| `STOCH` `RSI` `JEWEL` | Toggle Advanced Stoch / RSI divergence / Jewel~ + AutoFib |
+| `BB` `BBWP` `RSI` `MACD` | Toggle Bollinger / BBWP / RSI / MACD |
+| `STOCH` `RSIDIV` `JEWEL` | Toggle Advanced Stoch / RSI divergence / Jewel~ + AutoFib |
 | `/` or **F2** | Focus the command line |
 | **F1** | Help |
 | **F3** | Studies |
@@ -53,13 +54,17 @@ The HPDR family, Advanced Stoch, CT RSI Div and The Jewel used on TradingView ar
 | Study | How it's calculated here | Settings in `src/config.js` |
 |---|---|---|
 | **HPDR Bands** | Every past N-bar price change ("delta") is collected and sorted. Each range *p* is the band that held *p*% of those moves: `price[t−N] × (1 + percentile(deltas, 50 ± p/2))`. The median is the 50th percentile. Only past deltas are used. | `HPDR` (sampling 7, max array 100000, ranges 38.2…100) |
+| **BBWP** | Bollinger Band Width Percentile: band width `(upper − lower) / basis` with SMA 13 and 1 stdev, ranked against the last 252 bars (0 = tightest squeeze, 100 = widest), plus an SMA 5. Red bars at ≥ 98, blue bars at ≤ 2. | `BBWP` |
+| **RSI / MACD / BB** | Standard formulas (Wilder RSI 14 + SMA 14, MACD 12/26/9, Bollinger 20/2). | `RSISTD`, `MACD`, `BB` |
 | **HPDRO** | Percentile rank (0–100) of the current N-bar delta, with an SMA 5. Alert dots fire when it crosses beyond the 95% range. | `HPDRO` |
 | **HPDRV** | Percentile rank of the size of the current move (abs(delta)), with an SMA 5. Higher means a more volatile move than usual. | `HPDRV` |
 | **Advanced Stoch** | Stochastic with K 14, smoothing 6 and D 3. A dashed forecast extends K and D 3 bars ahead. The coloured line is stochastic volatility: where 14-bar volatility sits in its 255-bar range, smoothed 3. | `STOCH` |
 | **RSI Divergence** | Cutler RSI 14 (simple averages) with an SMA 12 signal. Pivots are confirmed 5 bars left and 3 right. Regular and hidden bull/bear divergences are checked within 50 bars. | `RSIDIV` |
 | **Jewel~** | *Interpretation:* Fast = RSI 14, Slow = EMA 9 of Fast, High = ADX × DMI factor, an EMA 21/55 trend strip at 110, background shading on EMA crosses, and AutoFib levels over the last 200 bars on the price chart. | `JEWEL` |
 
-Fills between bands aren't drawn; Lightweight Charts has no fill between two lines. That can be added later with a custom series plugin.
+Band fills (HPDR, Bollinger, the RSI zone) are drawn by a small canvas plugin in `src/primitives/bandFill.js`, because Lightweight Charts has no built-in fill between two lines.
+
+Not included: *Moon Phases* and *Trend Wave Catalyst [Quant Alchemy]* (hidden on the reference chart).
 
 This is an analysis tool, not financial advice.
 
@@ -71,7 +76,8 @@ src/
   main.js              UI, chart and wiring
   style.css            terminal theme
   data/                binance.js, twelvedata.js, index.js (routes by symbol)
-  studies.js           pane studies (HPDRO, HPDRV, Stoch, RSI, Jewel~)
+  studies.js           pane studies (BBWP, RSI, MACD, HPDRO, HPDRV, Stoch, RSI div, Jewel~)
+  primitives/          bandFill.js (fills between lines + HPDR range scale)
   indicators/          ma.js, cross.js, hpdr.js, oscillators.js (pure functions, unit-tested)
 test/                  node --test
 ```
