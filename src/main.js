@@ -102,6 +102,28 @@ const bbSeries = {
 const bbFill = new BandFill();
 bbSeries.upper.attachPrimitive(bbFill);
 
+// Mouse wheel over the PRICE axis zooms prices (like TradingView) instead of time.
+// Double-click the price axis to go back to auto-scale.
+$('chart').addEventListener('wheel', (e) => {
+  const rect = $('chart').getBoundingClientRect();
+  if (e.clientX < rect.right - chart.priceScale('right').width()) return; // over the plot → normal time zoom
+  const pane = chart.panes().find((p) => {
+    const r = p.getHTMLElement()?.getBoundingClientRect();
+    return r && e.clientY >= r.top && e.clientY <= r.bottom;
+  });
+  if (!pane || !e.deltaY) return;
+  const series = pane.paneIndex() === 0 ? candleSeries
+    : pane.getSeries().find((x) => (x.options().priceScaleId ?? 'right') === 'right');
+  const scale = series?.priceScale();
+  const range = scale?.getVisibleRange();
+  if (!range) return;
+  e.preventDefault(); e.stopPropagation();
+  const y = e.clientY - pane.getHTMLElement().getBoundingClientRect().top;
+  const anchor = series.coordinateToPrice(y) ?? (range.from + range.to) / 2;
+  const f = Math.exp(Math.max(-0.5, Math.min(0.5, e.deltaY / 800))); // ~12% per wheel notch, smooth on trackpads
+  scale.setVisibleRange({ from: anchor - (anchor - range.from) * f, to: anchor + (range.to - anchor) * f });
+}, { capture: true, passive: false });
+
 // ── Pane studies (HPDRO, HPDRV, Stoch, RSI, Jewel) ──
 let paneHandles = []; // [{study, handle}]
 function rebuildPanes() {
