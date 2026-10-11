@@ -407,6 +407,11 @@ function showMsg(text) { $('chartMsg').textContent = text; $('chartMsg').classLi
 
 // ── Loading a symbol ──
 async function load(symbol, interval) {
+  // Stocks / forex / gold spot need the user's own free Twelve Data key → ask for it first.
+  if (sourceFor(symbol) !== 'binance' && !state.apiKey) {
+    state.pendingLoad = { symbol, interval };
+    return openSettings(`${symbol} comes from Twelve Data and needs your free API key.`);
+  }
   const id = ++state.loadId;
   state.unsubscribe?.();
   state.symbol = symbol; state.interval = interval;
@@ -420,6 +425,8 @@ async function load(symbol, interval) {
     if (id !== state.loadId) return;
     state.candles = candles;
     state.lastOpen = true;
+    // new symbol → back to automatic price scaling (undo any manual price-axis zoom)
+    for (const pane of chart.panes()) for (const s of pane.getSeries()) s.priceScale().setAutoScale(true);
     candleSeries.setData(candles);
     volumeSeries.setData(candles.map((c) => ({ time: c.time, value: c.volume, color: c.close >= c.open ? 'rgba(38,208,124,.35)' : 'rgba(255,67,61,.35)' })));
     candleSeries.applyOptions({ priceFormat: { type: 'price', precision: decimals(candles.at(-1).close), minMove: 1 / 10 ** decimals(candles.at(-1).close) } });
@@ -567,18 +574,22 @@ function openHelp() {
     This tool is for analysis, not financial advice.</div>`);
 }
 
-function openSettings() {
+function openSettings(reason = '') {
   openModal('SETTINGS', `
-    <div>TWELVE DATA API KEY <span class="dim">(free at twelvedata.com — for stocks)</span></div>
+    ${reason ? `<div class="amber">${reason}</div>` : ''}
+    <div>TWELVE DATA API KEY <span class="dim">— for stocks (COIN, CRCL…), forex (USD/MXN) and gold spot (XAU/USD)</span></div>
     <input id="keyInput" placeholder="paste your key" value="${state.apiKey.replace(/"/g, '')}" />
-    <div class="dim">Saved only in this browser. Leave empty to use the limited "demo" key (AAPL only).</div>
+    <div class="dim">Free at <a href="https://twelvedata.com/account/api-keys" target="_blank" rel="noopener" class="amber">twelvedata.com → Account → API Keys</a>.
+    Saved only in this browser (enter it once per browser / device). Crypto, PAXG gold and USDT/MXN work without a key.</div>
     <button class="btn" id="keySave">SAVE</button>`);
   $('keySave').onclick = () => {
     state.apiKey = $('keyInput').value.trim();
     store.set('apiKey', state.apiKey);
     closeModal();
     refreshQuotes();
-    if (sourceFor(state.symbol) !== 'binance') load(state.symbol, state.interval);
+    const next = state.pendingLoad; state.pendingLoad = null;
+    if (next && state.apiKey) load(next.symbol, next.interval);
+    else if (sourceFor(state.symbol) !== 'binance') load(state.symbol, state.interval);
   };
 }
 
