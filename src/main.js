@@ -46,6 +46,12 @@ const fmtTime = (t) => (typeof t === 'string' ? t : new Date(t * 1000).toISOStri
 $('brandTag').textContent = BRAND.ticker;
 $('brandName').textContent = BRAND.name;
 document.title = BRAND.name;
+// Feedback / bug-report link (built in JS so simple spam bots don't scrape it from the HTML)
+if (BRAND.contact) {
+  const subject = encodeURIComponent(`${BRAND.name} — feedback / bug`);
+  $('contact').href = `mailto:${BRAND.contact}?subject=${subject}`;
+  $('contact').innerHTML = `<b>✉</b>FEEDBACK / BUGS: ${BRAND.contact}`;
+}
 
 // ── Chart ──
 const chart = createChart($('chart'), {

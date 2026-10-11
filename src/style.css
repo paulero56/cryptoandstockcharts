@@ -95,7 +95,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .fkeys button { display: flex; align-items: center; gap: 6px; padding: 2px 8px 2px 2px; border: 1px solid var(--line-2); white-space: nowrap; }
 .fkeys button:hover { border-color: var(--amber); }
 .fkeys b { background: var(--amber); color: #000; padding: 0 5px; }
-.fk-note { margin-left: auto; font-size: 11px; white-space: nowrap; }
+.fk-note { font-size: 11px; white-space: nowrap; }
+.fk-mail { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--amber); text-decoration: none; white-space: nowrap; padding: 2px 8px 2px 2px; border: 1px solid var(--line-2); }
+.fk-mail b { background: var(--amber); color: #000; padding: 0 5px; }
+.fk-mail:hover { border-color: var(--amber); }
 
 /* ── Modal ── */
 .modal { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.75); display: grid; place-items: center; padding: 16px; }

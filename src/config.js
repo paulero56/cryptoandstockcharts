@@ -5,6 +5,7 @@ export const BRAND = {
   name: 'PM TERMINAL',      // full name shown in the top bar
   ticker: 'PMT',            // short tag shown in the logo box
   tagline: 'MARKET ANALYTICS',
+  contact: 'montanopaul@gmail.com', // shown in the footer for feedback / bug reports
 };
 
 export const DEFAULTS = {
