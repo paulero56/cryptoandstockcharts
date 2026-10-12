@@ -130,3 +130,14 @@ test('symbol routing', () => {
   assert.equal(sourceFor('COIN'), 'twelvedata');
   assert.equal(sourceFor('CRCL'), 'twelvedata');
 });
+
+test('5D / 3M resampling', () => {
+  const day = (d, c) => ({ time: d, open: c, high: c + 1, low: c - 1, close: c, volume: 1 });
+  const days = Array.from({ length: 12 }, (_, i) => day(new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10), i));
+  const five = resample(days, '5D');
+  assert.ok(five.length >= 3 && five.length <= 4);
+  assert.equal(five.reduce((a, c) => a + c.volume, 0), 12);
+  const months = ['2026-01-01', '2026-02-01', '2026-03-01', '2026-04-01'].map((d, i) => day(d, i));
+  const q = resample(months, '3M');
+  assert.equal(q.length, 2); assert.equal(q[0].close, 2); assert.equal(q[1].open, 3);
+});

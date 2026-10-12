@@ -120,5 +120,5 @@ export const LABELS = {
   PAXGUSDT: 'GOLD·PAXG', USDTMXN: 'USD/MXN·T', COIN: 'COINBASE', CRCL: 'CIRCLE', 'XAU/USD': 'GOLD', 'USD/MXN': 'USD/MXN',
 };
 
-export const INTERVALS = ['1m', '5m', '15m', '1H', '4H', '1D', '1W', '2W', '1M', '1Y'];
-export const INTERVAL_SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1H': 3600, '4H': 14400, '1D': 86400, '1W': 604800, '2W': 1209600, '1M': 2592000, '1Y': 31557600 };
+export const INTERVALS = ['1m', '5m', '15m', '1H', '4H', '1D', '5D', '1W', '2W', '1M', '3M', '1Y'];
+export const INTERVAL_SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1H': 3600, '4H': 14400, '1D': 86400, '5D': 432000, '1W': 604800, '2W': 1209600, '1M': 2592000, '3M': 7776000, '1Y': 31557600 };

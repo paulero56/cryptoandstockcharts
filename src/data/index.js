@@ -12,13 +12,15 @@ export function sourceFor(symbol) {
 }
 
 // ── Resampled timeframes (not offered natively by the data sources) ──
-const RESAMPLED = { '2W': '1W', '1Y': '1M' };
+const RESAMPLED = { '5D': '1D', '2W': '1W', '3M': '1M', '1Y': '1M' };
 const toSec = (t) => (typeof t === 'number' ? t : Date.parse(t + 'T00:00:00Z') / 1000);
 const MONDAY_EPOCH = 4 * 86400; // 1970-01-05 was a Monday
 
 export function bucketKey(time, interval) {
   const sec = toSec(time);
   if (interval === '2W') return Math.floor(Math.floor((sec - MONDAY_EPOCH) / 604800) / 2);
+  if (interval === '5D') return Math.floor(sec / 86400 / 5);                 // 5-day blocks
+  if (interval === '3M') { const d = new Date(sec * 1000); return d.getUTCFullYear() * 4 + Math.floor(d.getUTCMonth() / 3); } // quarters
   if (interval === '1Y') return new Date(sec * 1000).getUTCFullYear();
   return sec;
 }

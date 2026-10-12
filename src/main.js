@@ -518,6 +518,7 @@ function parseInterval(tok) {
   if (up === 'DAILY') return '1D';
   if (up === 'WEEKLY') return '1W';
   if (up === 'YEARLY' || up === '12M') return '1Y';
+  if (up === '3M' || up === '3MO' || up === 'QUARTERLY') return '3M';
   if (/^\d+[DHWY]$/.test(up) && INTERVALS.includes(up)) return up;
   if (/^\d+M$/.test(tok) && INTERVALS.includes(tok.toLowerCase())) return tok.toLowerCase();
   return null;
@@ -565,7 +566,7 @@ function openHelp() {
       <tr><td><code>HPDR</code> <code>HPDRO</code> <code>HPDRV</code></td><td>Toggle HPDR bands / oscillator / volatility</td></tr>
       <tr><td><code>STOCH</code> <code>RSI</code> <code>JEWEL</code></td><td>Toggle Advanced Stoch / RSI divergence / Jewel~ + AutoFib</td></tr>
       <tr><td><code>ADD PEPEUSDT</code> <code>DEL COIN</code></td><td>Add / remove a watchlist symbol (or use the box under the watchlist)</td></tr>
-      <tr><td><code>2W</code> <code>1Y</code></td><td>2-week and yearly candles (built from weekly / monthly data)</td></tr>
+      <tr><td><code>5D</code> <code>2W</code> <code>3M</code> <code>1Y</code></td><td>5-day, 2-week, quarterly and yearly candles (built from daily / weekly / monthly data)</td></tr>
       <tr><td><b>T</b> / <b>H</b> / <b>M</b></td><td>Draw a trend line / horizontal line / measure box. <b>Shift + click</b> = quick measure. Click a drawing + <b>Delete</b> to remove it.</td></tr>
       <tr><td><code>KEY abc123</code></td><td>Set your Twelve Data API key</td></tr>
     </table>
