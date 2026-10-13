@@ -1,6 +1,8 @@
 // Stocks / ETFs / forex via Twelve Data (free plan: 8 requests/min, 800/day).
 // Get a free key at https://twelvedata.com and enter it with F8 in the app.
 // The "demo" key only works for a few symbols such as AAPL.
+import { isMarketOpen } from './markets.js';
+
 const REST = 'https://api.twelvedata.com';
 
 const INTERVAL_MAP = { '1m': '1min', '5m': '5min', '15m': '15min', '1H': '1h', '4H': '4h', '1D': '1day', '1W': '1week', '1M': '1month' };
@@ -20,17 +22,23 @@ export async function fetchCandles(symbol, interval, apiKey, limit = 1000) {
   }));
 }
 
-// No free websocket on the basic plan → poll. Re-fetches the last 2 bars.
+// No free websocket on the basic plan → poll every 60 s (1 credit each).
+// Skips while the tab is hidden or the market is closed, to save credits.
+// The returned stop() also has .refresh() to update right now (⟳ button).
 // The previous bar is reported as closed so crossover signals stay honest.
 export function subscribe(symbol, interval, apiKey, onCandle, everyMs = 60_000) {
-  const id = setInterval(async () => {
+  const poll = async (force = false) => {
+    if (!force && (document.hidden || !isMarketOpen(symbol))) return;
     try {
       const bars = await fetchCandles(symbol, interval, apiKey, 2);
       if (bars.length === 2) onCandle(bars[0], true);
       if (bars.length) onCandle(bars[bars.length - 1], false);
     } catch { /* keep the last good data on screen */ }
-  }, everyMs);
-  return () => clearInterval(id);
+  };
+  const id = setInterval(poll, everyMs);
+  const stop = () => clearInterval(id);
+  stop.refresh = () => poll(true);
+  return stop;
 }
 
 // Latest price + daily % change for several symbols in one request.

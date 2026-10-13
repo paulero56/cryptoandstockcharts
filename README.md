@@ -4,7 +4,7 @@ A Bloomberg-style charting terminal built with open-source tools. It looks and w
 
 - **Charts:** [TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts) (Apache-2.0)
 - **Crypto:** Binance public market data, real time over WebSocket, no API key needed
-- **Stocks:** [Twelve Data](https://twelvedata.com), free API key, refreshed every 60 s
+- **Stocks / forex:** [Twelve Data](https://twelvedata.com), free API key. Open chart updates every 60 s (plus a **⟳ UPDATE** button); watchlist quotes every 10 min. Nothing is fetched while the tab is hidden or the market is closed, so a full day stays under the free 800 credits.
 - **Overlays:** EMA 5/9/21/34/55/100/200, SMA 9/100/200, SMA 9 × SMA 200 crossover signals, Bollinger Bands 20/2, HPDR Bands with coloured fills, range scale and forward projection, AutoFib
 - **Panes:** BBWP (13/252, SMA 5, 98/2 extremes), RSI 14 + SMA 14 with 30–70 zone, MACD 12/26/9, HPDRO, HPDRV, Advanced Stoch (forecast + stochastic volatility), RSI divergence (Cutler RSI, pivots, regular + hidden), Jewel~
 - **Drawing tools:** trend line (shows % and bars), horizontal line (shows % from price), measure box (change, %, bars, time, volume — like TradingView). Saved per symbol.

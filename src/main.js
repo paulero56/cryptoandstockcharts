@@ -3,6 +3,7 @@ import { createChart, CrosshairMode, LineStyle, CandlestickSeries, HistogramSeri
 import { BRAND, DEFAULTS, MOVING_AVERAGES, CROSS, HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BB, BBWP, RSISTD, MACD, WATCHLIST, LABELS, INTERVALS, INTERVAL_SECONDS } from './config.js';
 import { fetchCandles, subscribe, sourceFor, fetchCryptoTickers, fetchMarketQuotes } from './data/index.js';
 import { createDrawingTools } from './drawings.js';
+import { isMarketOpen } from './data/markets.js';
 import { movingAverage } from './indicators/ma.js';
 import { crossovers } from './indicators/cross.js';
 import { computeHpdr } from './indicators/hpdr.js';
@@ -456,7 +457,8 @@ async function load(symbol, interval) {
     chart.timeScale().fitContent();
     showMsg('');
     const live = sourceFor(symbol) === 'binance';
-    setStatus(live ? 'live' : 'poll', live ? 'LIVE' : 'POLLING 60s');
+    setStatus(live ? 'live' : 'poll', live ? 'LIVE' : (isMarketOpen(symbol) ? 'UPDATES EVERY 60s' : 'MARKET CLOSED'));
+    $('refreshNow').hidden = live;
     state.unsubscribe = subscribe(symbol, interval, onLiveCandle, { apiKey: state.apiKey });
   } catch (err) {
     if (id !== state.loadId) return;
@@ -506,8 +508,17 @@ async function refreshTickers() {
   if (!list.length) return;
   try { for (const t of await fetchCryptoTickers(list)) tickers[t.symbol] = t; renderWatch(); } catch { /* offline */ }
 }
-async function refreshQuotes() {
-  const list = state.watch.filter((s) => !isCrypto(s));
+// Twelve Data quotes (1 credit per symbol): every 10 min, only while the tab is
+// visible and only for markets that are open. force = fetch all once (startup).
+let lastQuotes = 0;
+async function refreshQuotes(force = false, only = null) {
+  let list = only || state.watch.filter((s) => !isCrypto(s));
+  if (!force) {
+    if (document.hidden) return;
+    list = list.filter((s) => isMarketOpen(s));
+  }
+  if (!list.length || !state.apiKey) return;
+  lastQuotes = Date.now();
   try { for (const t of await fetchMarketQuotes(list, state.apiKey)) tickers[t.symbol] = t; renderWatch(); } catch { /* no key / limit */ }
 }
 function saveWatch() { store.set('watch', state.watch); renderWatch(); }
@@ -517,7 +528,7 @@ async function addSymbol(raw) {
   try {
     await fetchCandles(s, '1D', { apiKey: state.apiKey }); // validate before adding
     state.watch.push(s); saveWatch();
-    isCrypto(s) ? refreshTickers() : refreshQuotes();
+    isCrypto(s) ? refreshTickers() : refreshQuotes(true, [s]);
   } catch (err) {
     showMsg(`CAN'T ADD ${s}: ${err.message}`); setTimeout(() => showMsg(''), 3500);
   }
@@ -611,7 +622,7 @@ function openSettings(reason = '') {
     state.apiKey = $('keyInput').value.trim();
     store.set('apiKey', state.apiKey);
     closeModal();
-    refreshQuotes();
+    refreshQuotes(true);
     const next = state.pendingLoad; state.pendingLoad = null;
     if (next && state.apiKey) load(next.symbol, next.interval);
     else if (sourceFor(state.symbol) !== 'binance') load(state.symbol, state.interval);
@@ -648,6 +659,19 @@ renderIntervals();
 renderWatch();
 refreshTickers();
 setInterval(refreshTickers, 10_000);
-refreshQuotes();
-setInterval(refreshQuotes, 120_000); // Twelve Data free plan: ~800 credits/day
+refreshQuotes(true);
+setInterval(() => refreshQuotes(), 600_000); // every 10 min — Twelve Data free plan: 800 credits/day
+
+// ⟳ UPDATE: refresh a Twelve Data chart right now (1 credit)
+$('refreshNow').addEventListener('click', async () => {
+  const btn = $('refreshNow');
+  btn.classList.add('busy');
+  try { await state.unsubscribe?.refresh?.(); } finally { setTimeout(() => btn.classList.remove('busy'), 600); }
+});
+// Back to the tab → update right away instead of waiting for the next tick
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (sourceFor(state.symbol) !== 'binance' && isMarketOpen(state.symbol)) state.unsubscribe?.refresh?.();
+  if (Date.now() - lastQuotes > 600_000) refreshQuotes();
+});
 load(state.symbol, state.interval);

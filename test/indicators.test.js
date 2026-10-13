@@ -141,3 +141,16 @@ test('5D / 3M resampling', () => {
   const q = resample(months, '3M');
   assert.equal(q.length, 2); assert.equal(q[0].close, 2); assert.equal(q[1].open, 3);
 });
+
+
+import { isMarketOpen } from '../src/data/markets.js';
+
+test('market hours (New York)', () => {
+  const at = (iso) => new Date(iso);
+  assert.equal(isMarketOpen('COIN', at('2026-10-14T15:00:00Z')), true);   // Wed 11:00 NY
+  assert.equal(isMarketOpen('COIN', at('2026-10-14T21:00:00Z')), false);  // Wed 17:00 NY
+  assert.equal(isMarketOpen('COIN', at('2026-10-17T15:00:00Z')), false);  // Saturday
+  assert.equal(isMarketOpen('USD/MXN', at('2026-10-14T03:00:00Z')), true); // Tue 23:00 NY
+  assert.equal(isMarketOpen('XAU/USD', at('2026-10-17T15:00:00Z')), false); // Saturday
+  assert.equal(isMarketOpen('USD/MXN', at('2026-10-18T22:00:00Z')), true);  // Sun 18:00 NY
+});
