@@ -33,6 +33,7 @@ Deploy to Netlify by connecting the repo. `netlify.toml` is already set up.
 | `HPDR` `HPDRO` `HPDRV` | Toggle HPDR bands / oscillator / volatility |
 | `BB` `BBWP` `RSI` `MACD` | Toggle Bollinger / BBWP / RSI / MACD |
 | `STOCH` `RSIDIV` `JEWEL` | Toggle Advanced Stoch / RSI divergence / Jewel~ + AutoFib |
+| `CLEAR` or **ALL OFF** button | Turn every study off at once; again (**RESTORE**) brings back your previous selection |
 | `ADD PEPEUSDT` / `DEL COIN` | Add / remove a watchlist symbol (or use the box under the watchlist) |
 | **T** / **H** / **M** | Trend line / horizontal line / measure. **Shift + click** = quick measure. Click a drawing, then **Delete** |
 | `/` or **F2** | Focus the command line |

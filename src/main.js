@@ -375,6 +375,7 @@ function renderStudies() {
       + `<span class="swatch" style="background:${t.color}"></span>${t.label}</label>`);
   }
   $('studies').innerHTML = items.join('');
+  updateAllButton();
 }
 
 function toggle(key, value = !state.on[key]) {
@@ -384,6 +385,27 @@ function toggle(key, value = !state.on[key]) {
   renderStudies();
   draw();
 }
+
+// ── One click: all studies off / restore the previous selection ──
+const anyStudyOn = () => Object.values(state.visible).some(Boolean) || TOGGLES.some((t) => state.on[t.key]);
+function updateAllButton() {
+  $('studiesAll').textContent = anyStudyOn() ? 'ALL OFF' : (store.get('studiesSnapshot', null) ? 'RESTORE' : 'ALL OFF');
+}
+function toggleAllStudies() {
+  if (anyStudyOn()) {
+    store.set('studiesSnapshot', { visible: state.visible, on: state.on });
+    state.visible = Object.fromEntries(Object.keys(state.visible).map((k) => [k, false]));
+    state.on = Object.fromEntries(Object.keys(state.on).map((k) => [k, false]));
+  } else {
+    const snap = store.get('studiesSnapshot', null);
+    if (!snap) return;
+    state.visible = { ...state.visible, ...snap.visible };
+    state.on = { ...state.on, ...snap.on };
+  }
+  store.set('visible', state.visible); store.set('on', state.on);
+  rebuildPanes(); renderStudies(); draw();
+}
+$('studiesAll').addEventListener('click', toggleAllStudies);
 
 $('studies').addEventListener('change', (e) => {
   const t = e.target;
@@ -532,6 +554,7 @@ $('cmdForm').addEventListener('submit', (e) => {
   const toks = raw.split(/\s+/);
   const head = toks[0].toUpperCase();
   if (head === 'HELP') return openHelp();
+  if ((head === 'CLEAR' || head === 'CLEAN') && toks.length === 1) return toggleAllStudies();
   if (head === 'ADD' && toks[1]) return addSymbol(toks[1]);
   if ((head === 'DEL' || head === 'REMOVE') && toks[1]) return removeSymbol(toks[1].toUpperCase());
   if (head === 'KEY') { state.apiKey = toks[1] || ''; store.set('apiKey', state.apiKey); return load(state.symbol, state.interval); }
@@ -565,6 +588,7 @@ function openHelp() {
       <tr><td><code>AAPL 1W</code></td><td>Stocks via Twelve Data (needs key, F8)</td></tr>
       <tr><td><code>HPDR</code> <code>HPDRO</code> <code>HPDRV</code></td><td>Toggle HPDR bands / oscillator / volatility</td></tr>
       <tr><td><code>STOCH</code> <code>RSI</code> <code>JEWEL</code></td><td>Toggle Advanced Stoch / RSI divergence / Jewel~ + AutoFib</td></tr>
+      <tr><td><code>CLEAR</code></td><td>All studies off with one click — again to restore them (same as the ALL OFF button)</td></tr>
       <tr><td><code>ADD PEPEUSDT</code> <code>DEL COIN</code></td><td>Add / remove a watchlist symbol (or use the box under the watchlist)</td></tr>
       <tr><td><code>5D</code> <code>2W</code> <code>3M</code> <code>1Y</code></td><td>5-day, 2-week, quarterly and yearly candles (built from daily / weekly / monthly data)</td></tr>
       <tr><td><b>T</b> / <b>H</b> / <b>M</b></td><td>Draw a trend line / horizontal line / measure box. <b>Shift + click</b> = quick measure. Click a drawing + <b>Delete</b> to remove it.</td></tr>

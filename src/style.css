@@ -137,6 +137,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 #chart { left: 35px; }
 .legend, .pane-legend { left: 45px; }
 
+/* ── Studies: all off / restore ── */
+.all-off { font-size: 10px; letter-spacing: 1px; color: var(--amber); border: 1px solid var(--amber-dim); padding: 0 6px; }
+.all-off:hover { background: var(--amber); color: #000; }
+
 /* ── Watchlist add/remove ── */
 .watch td.x { width: 18px; padding: 0 6px 0 0; text-align: center; color: transparent; }
 .watch tr:hover td.x { color: var(--dim); }
