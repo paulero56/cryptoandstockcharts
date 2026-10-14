@@ -625,7 +625,7 @@ function openHelp() {
       <tr><td><code>CLEAR</code></td><td>All studies off with one click — again to restore them (same as the ALL OFF button)</td></tr>
       <tr><td><code>ADD PEPEUSDT</code> <code>DEL COIN</code></td><td>Add / remove a watchlist symbol (or use the box under the watchlist)</td></tr>
       <tr><td><code>5D</code> <code>2W</code> <code>3M</code> <code>1Y</code></td><td>5-day, 2-week, quarterly and yearly candles (built from daily / weekly / monthly data)</td></tr>
-      <tr><td><b>T</b> / <b>H</b> / <b>M</b></td><td>Draw a trend line / horizontal line / measure box. <b>Shift + click</b> = quick measure. Click a drawing + <b>Delete</b> to remove it.</td></tr>
+      <tr><td><b>T</b> / <b>H</b> / <b>B</b> / <b>M</b></td><td>Trend line / horizontal line / brush (click and drag) / measure box. <b>Shift + click</b> = quick measure. Pick a neon color in the toolbar (also recolors the selected drawing). Click a drawing + <b>Delete</b> to remove it.</td></tr>
       <tr><td><code>KEY abc123</code></td><td>Set your Twelve Data API key</td></tr>
     </table>
     <div class="dim">Crypto pairs ending in USDT / USDC / BTC… load from Binance (live). Everything else loads from Twelve Data (polled every 60s).<br>

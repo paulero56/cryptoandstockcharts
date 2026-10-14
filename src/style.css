@@ -137,6 +137,11 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 #chart { left: 35px; }
 .legend, .pane-legend { left: 45px; }
 
+/* ── Drawing colors (neon palette in the toolbar) ── */
+.palette { display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line-2); }
+.tools .swatch-btn, .tools .swatch-btn.on, .tools .swatch-btn:hover { width: 16px; height: 16px; border-radius: 50%; background: var(--c); border: 2px solid #000; box-shadow: 0 0 6px var(--c); padding: 0; }
+.tools .swatch-btn.on { outline: 2px solid #fff; outline-offset: 2px; }
+
 /* ── Timeframe menu ── */
 .tf-wrap { position: relative; }
 .intervals .tf-more { color: var(--amber); padding: 3px 8px; }
