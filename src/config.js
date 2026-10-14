@@ -120,5 +120,18 @@ export const LABELS = {
   PAXGUSDT: 'GOLD·PAXG', USDTMXN: 'USD/MXN·T', COIN: 'COINBASE', CRCL: 'CIRCLE', 'XAU/USD': 'GOLD', 'USD/MXN': 'USD/MXN',
 };
 
-export const INTERVALS = ['1m', '5m', '15m', '1H', '4H', '1D', '5D', '1W', '2W', '1M', '3M', '1Y'];
-export const INTERVAL_SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1H': 3600, '4H': 14400, '1D': 86400, '5D': 432000, '1W': 604800, '2W': 1209600, '1M': 2592000, '3M': 7776000, '1Y': 31557600 };
+// Timeframes, grouped like TradingView's menu. Favorites (★) show as buttons; the rest live in the ▾ menu.
+export const INTERVAL_GROUPS = [
+  { label: 'MINUTES', items: ['1m', '3m', '5m', '15m', '30m', '45m'] },
+  { label: 'HOURS',   items: ['1H', '2H', '3H', '4H', '6H', '8H', '12H'] },
+  { label: 'DAYS',    items: ['1D', '2D', '3D', '5D'] },
+  { label: 'WEEKS · MONTHS', items: ['1W', '2W', '1M', '3M', '1Y'] },
+];
+export const FAVORITE_INTERVALS = ['15m', '1H', '4H', '1D', '1W', '1M'];
+export const INTERVALS = INTERVAL_GROUPS.flatMap((g) => g.items);
+export const INTERVAL_SECONDS = {
+  '1m': 60, '3m': 180, '5m': 300, '15m': 900, '30m': 1800, '45m': 2700,
+  '1H': 3600, '2H': 7200, '3H': 10800, '4H': 14400, '6H': 21600, '8H': 28800, '12H': 43200,
+  '1D': 86400, '2D': 172800, '3D': 259200, '5D': 432000,
+  '1W': 604800, '2W': 1209600, '1M': 2592000, '3M': 7776000, '1Y': 31557600,
+};

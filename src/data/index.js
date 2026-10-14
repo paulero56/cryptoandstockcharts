@@ -2,6 +2,7 @@
 // whether a symbol is crypto or a stock, or whether a timeframe is native.
 import * as binance from './binance.js';
 import * as twelve from './twelvedata.js';
+import { INTERVAL_SECONDS as SECS } from '../config.js';
 
 // Binance pairs end in one of these quote assets (USDTMXN = dollar vs peso, PAXGUSDT = gold).
 const CRYPTO_QUOTES = /(USDT|USDC|FDUSD|BUSD|USD1|BTC|ETH|BNB|EUR|TRY|MXN|BRL|JPY)$/;
@@ -11,18 +12,32 @@ export function sourceFor(symbol) {
   return CRYPTO_QUOTES.test(symbol) && symbol.length > 5 ? 'binance' : 'twelvedata';
 }
 
-// ── Resampled timeframes (not offered natively by the data sources) ──
-const RESAMPLED = { '5D': '1D', '2W': '1W', '3M': '1M', '1Y': '1M' };
+// ── Resampled timeframes (not offered natively by the data source) ──
+const NATIVE = {
+  binance: new Set(Object.keys(binance.INTERVAL_MAP)),
+  twelvedata: new Set(Object.keys(twelve.INTERVAL_MAP)),
+};
 const toSec = (t) => (typeof t === 'number' ? t : Date.parse(t + 'T00:00:00Z') / 1000);
 const MONDAY_EPOCH = 4 * 86400; // 1970-01-05 was a Monday
+
+// Which native interval to build `interval` from (null = it's native already).
+export function baseInterval(symbol, interval) {
+  const native = NATIVE[sourceFor(symbol)];
+  if (native.has(interval)) return null;
+  if (interval === '2W') return '1W';
+  if (interval === '3M' || interval === '1Y') return '1M';
+  const target = SECS[interval];
+  return [...native]
+    .filter((iv) => !['1W', '1M'].includes(iv) && SECS[iv] < target && target % SECS[iv] === 0)
+    .sort((a, b) => SECS[b] - SECS[a])[0];
+}
 
 export function bucketKey(time, interval) {
   const sec = toSec(time);
   if (interval === '2W') return Math.floor(Math.floor((sec - MONDAY_EPOCH) / 604800) / 2);
-  if (interval === '5D') return Math.floor(sec / 86400 / 5);                 // 5-day blocks
   if (interval === '3M') { const d = new Date(sec * 1000); return d.getUTCFullYear() * 4 + Math.floor(d.getUTCMonth() / 3); } // quarters
   if (interval === '1Y') return new Date(sec * 1000).getUTCFullYear();
-  return sec;
+  return Math.floor(sec / (SECS[interval] || 1)); // fixed-length blocks: 3m, 45m, 3H, 2D, 5D…
 }
 
 function merge(group) {
@@ -57,7 +72,7 @@ async function fetchRaw(symbol, interval, opts) {
 }
 
 export async function fetchCandles(symbol, interval, opts = {}) {
-  const base = RESAMPLED[interval];
+  const base = baseInterval(symbol, interval);
   if (!base) return fetchRaw(symbol, interval, opts);
   const raw = await fetchRaw(symbol, base, opts);
   baseCache.set(`${symbol}|${interval}`, raw);
@@ -71,7 +86,7 @@ function subscribeRaw(symbol, interval, onCandle, opts) {
 }
 
 export function subscribe(symbol, interval, onCandle, opts = {}) {
-  const base = RESAMPLED[interval];
+  const base = baseInterval(symbol, interval);
   if (!base) return subscribeRaw(symbol, interval, onCandle, opts);
   const raw = baseCache.get(`${symbol}|${interval}`) || [];
   let lastKey = raw.length ? bucketKey(raw[raw.length - 1].time, interval) : null;

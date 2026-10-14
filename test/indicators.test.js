@@ -154,3 +154,17 @@ test('market hours (New York)', () => {
   assert.equal(isMarketOpen('XAU/USD', at('2026-10-17T15:00:00Z')), false); // Saturday
   assert.equal(isMarketOpen('USD/MXN', at('2026-10-18T22:00:00Z')), true);  // Sun 18:00 NY
 });
+
+import { baseInterval } from '../src/data/index.js';
+
+test('every timeframe has a source: native or resampled', () => {
+  assert.equal(baseInterval('BTCUSDT', '4H'), null);   // native on Binance
+  assert.equal(baseInterval('BTCUSDT', '3H'), '1H');
+  assert.equal(baseInterval('BTCUSDT', '45m'), '15m');
+  assert.equal(baseInterval('BTCUSDT', '2D'), '1D');
+  assert.equal(baseInterval('BTCUSDT', '3D'), null);   // native on Binance
+  assert.equal(baseInterval('COIN', '3D'), '1D');      // not native on Twelve Data
+  assert.equal(baseInterval('COIN', '12H'), '4H');
+  assert.equal(baseInterval('COIN', '3m'), '1m');
+  assert.equal(bucketKey(10800 * 5 + 100, '3H'), 5);
+});

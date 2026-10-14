@@ -137,6 +137,21 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 #chart { left: 35px; }
 .legend, .pane-legend { left: 45px; }
 
+/* ── Timeframe menu ── */
+.tf-wrap { position: relative; }
+.intervals .tf-more { color: var(--amber); padding: 3px 8px; }
+.tf-menu { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; display: grid; grid-template-columns: repeat(4, auto); gap: 4px 18px;
+  background: #0a0a0a; border: 1px solid var(--amber); padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
+.tf-menu[hidden] { display: none; }
+.tf-label { color: var(--dim); font-size: 10px; letter-spacing: 1px; margin-bottom: 4px; white-space: nowrap; }
+.tf-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tf-item button[data-iv] { padding: 2px 6px; min-width: 42px; text-align: left; }
+.tf-item button[data-iv]:hover { color: var(--amber); }
+.tf-item.on button[data-iv] { background: var(--amber); color: #000; font-weight: 700; }
+.tf-item .star { color: #333; font-size: 12px; }
+.tf-item .star.fav { color: var(--amber); }
+@media (max-width: 860px) { .tf-menu { grid-template-columns: repeat(2, auto); } }
+
 /* ── Refresh now (Twelve Data symbols) ── */
 .refresh { font-size: 11px; color: var(--amber); border: 1px solid var(--amber-dim); padding: 1px 8px; margin-right: 6px; }
 .refresh:hover { background: var(--amber); color: #000; }

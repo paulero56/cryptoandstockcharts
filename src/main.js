@@ -1,6 +1,6 @@
 import './style.css';
 import { createChart, CrosshairMode, LineStyle, CandlestickSeries, HistogramSeries, LineSeries, createSeriesMarkers } from 'lightweight-charts';
-import { BRAND, DEFAULTS, MOVING_AVERAGES, CROSS, HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BB, BBWP, RSISTD, MACD, WATCHLIST, LABELS, INTERVALS, INTERVAL_SECONDS } from './config.js';
+import { BRAND, DEFAULTS, MOVING_AVERAGES, CROSS, HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BB, BBWP, RSISTD, MACD, WATCHLIST, LABELS, INTERVALS, INTERVAL_SECONDS, INTERVAL_GROUPS, FAVORITE_INTERVALS } from './config.js';
 import { fetchCandles, subscribe, sourceFor, fetchCryptoTickers, fetchMarketQuotes } from './data/index.js';
 import { createDrawingTools } from './drawings.js';
 import { isMarketOpen } from './data/markets.js';
@@ -482,10 +482,33 @@ function onLiveCandle(c, isClosed) {
 }
 
 // ── Intervals ──
+// Timeframes: favorites as buttons + a ▾ menu with every timeframe (★ = toggle favorite)
+state.favIntervals = store.get('favIntervals', FAVORITE_INTERVALS);
 function renderIntervals() {
-  $('intervals').innerHTML = INTERVALS.map((iv) => `<button data-iv="${iv}" class="${iv === state.interval ? 'on' : ''}">${iv}</button>`).join('');
+  const favs = INTERVALS.filter((iv) => state.favIntervals.includes(iv));
+  if (!favs.includes(state.interval)) favs.push(state.interval);
+  $('intervals').innerHTML = favs.map((iv) => `<button data-iv="${iv}" class="${iv === state.interval ? 'on' : ''}">${iv}</button>`).join('')
+    + `<button class="tf-more" data-menu="1" title="All timeframes">▾</button>`;
+  $('tfMenu').innerHTML = INTERVAL_GROUPS.map((g) => `<div class="tf-group"><div class="tf-label">${g.label}</div>`
+    + g.items.map((iv) => `<div class="tf-item ${iv === state.interval ? 'on' : ''}"><button data-iv="${iv}">${iv}</button>`
+      + `<button class="star ${state.favIntervals.includes(iv) ? 'fav' : ''}" data-star="${iv}" title="Show as a button">★</button></div>`).join('')
+    + '</div>').join('');
 }
-$('intervals').addEventListener('click', (e) => { const iv = e.target.dataset.iv; if (iv) load(state.symbol, iv); });
+function closeTfMenu() { $('tfMenu').hidden = true; }
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button');
+  const inBar = e.target.closest('#intervals'), inMenu = e.target.closest('#tfMenu');
+  if (!inBar && !inMenu) return closeTfMenu();
+  if (!t) return;
+  if (t.dataset.menu) { $('tfMenu').hidden = !$('tfMenu').hidden; return; }
+  if (t.dataset.star) {
+    const iv = t.dataset.star;
+    state.favIntervals = state.favIntervals.includes(iv) ? state.favIntervals.filter((x) => x !== iv) : [...state.favIntervals, iv];
+    store.set('favIntervals', state.favIntervals);
+    return renderIntervals();
+  }
+  if (t.dataset.iv) { closeTfMenu(); load(state.symbol, t.dataset.iv); }
+});
 
 // ── Watchlist (editable, saved in this browser) ──
 state.watch = store.get('watch', WATCHLIST);

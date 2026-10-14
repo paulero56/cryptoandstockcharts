@@ -5,8 +5,12 @@ import { isMarketOpen } from './markets.js';
 
 const REST = 'https://api.twelvedata.com';
 
-const INTERVAL_MAP = { '1m': '1min', '5m': '5min', '15m': '15min', '1H': '1h', '4H': '4h', '1D': '1day', '1W': '1week', '1M': '1month' };
-const INTRADAY = new Set(['1m', '5m', '15m', '1H', '4H']);
+// Native Twelve Data intervals (anything else is built by resampling in data/index.js)
+export const INTERVAL_MAP = {
+  '1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min', '45m': '45min',
+  '1H': '1h', '2H': '2h', '4H': '4h', '1D': '1day', '1W': '1week', '1M': '1month',
+};
+const INTRADAY = new Set(['1m', '5m', '15m', '30m', '45m', '1H', '2H', '4H']);
 
 export async function fetchCandles(symbol, interval, apiKey, limit = 1000) {
   const url = `${REST}/time_series?symbol=${encodeURIComponent(symbol)}&interval=${INTERVAL_MAP[interval]}`

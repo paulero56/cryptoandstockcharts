@@ -8,7 +8,7 @@ A Bloomberg-style charting terminal built with open-source tools. It looks and w
 - **Overlays:** EMA 5/9/21/34/55/100/200, SMA 9/100/200, SMA 9 × SMA 200 crossover signals, Bollinger Bands 20/2, HPDR Bands with coloured fills, range scale and forward projection, AutoFib
 - **Panes:** BBWP (13/252, SMA 5, 98/2 extremes), RSI 14 + SMA 14 with 30–70 zone, MACD 12/26/9, HPDRO, HPDRV, Advanced Stoch (forecast + stochastic volatility), RSI divergence (Cutler RSI, pivots, regular + hidden), Jewel~
 - **Drawing tools:** trend line (shows % and bars), horizontal line (shows % from price), measure box (change, %, bars, time, volume — like TradingView). Saved per symbol.
-- **Timeframes:** 1m 5m 15m 1H 4H 1D **5D** 1W **2W** 1M **3M** **1Y** (5D, 2W, 3M and 1Y are built from daily / weekly / monthly candles)
+- **Timeframes (like TradingView):** minutes 1m 3m 5m 15m 30m 45m · hours 1H 2H 3H 4H 6H 8H 12H · days 1D 2D 3D 5D · 1W 2W 1M 3M 1Y. Favorites (★) show as buttons, the rest are in the **▾** menu. Anything a data source doesn't offer natively is built from smaller candles.
 - **Watchlist:** add/remove any symbol; defaults include altcoins, gold (PAXGUSDT, live), USD/MXN (USDTMXN, live), Coinbase (COIN), Circle (CRCL), gold spot (XAU/USD) and USD/MXN forex
 - **Terminal UI:** command line, function keys, watchlist, signals panel
 

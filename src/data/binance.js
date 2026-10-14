@@ -4,7 +4,12 @@
 const REST = 'https://data-api.binance.vision/api/v3';
 const WS = 'wss://data-stream.binance.vision/ws';
 
-const INTERVAL_MAP = { '1m': '1m', '5m': '5m', '15m': '15m', '1H': '1h', '4H': '4h', '1D': '1d', '1W': '1w', '1M': '1M' };
+// Native Binance intervals (anything else is built by resampling in data/index.js)
+export const INTERVAL_MAP = {
+  '1m': '1m', '3m': '3m', '5m': '5m', '15m': '15m', '30m': '30m',
+  '1H': '1h', '2H': '2h', '4H': '4h', '6H': '6h', '8H': '8h', '12H': '12h',
+  '1D': '1d', '3D': '3d', '1W': '1w', '1M': '1M',
+};
 
 const toCandle = (k) => ({
   time: Math.floor(k[0] / 1000),
