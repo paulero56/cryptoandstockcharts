@@ -11,6 +11,7 @@ A Bloomberg-style charting terminal built with open-source tools. It looks and w
 - **Timeframes (like TradingView):** minutes 1m 3m 5m 15m 30m 45m · hours 1H 2H 3H 4H 6H 8H 12H · days 1D 2D 3D 5D · 1W 2W 1M 3M 1Y. Favorites (★) show as buttons, the rest are in the **▾** menu. Anything a data source doesn't offer natively is built from smaller candles.
 - **Watchlist:** add/remove any symbol; defaults include altcoins, gold (PAXGUSDT, live), USD/MXN (USDTMXN, live), Coinbase (COIN), Circle (CRCL), gold spot (XAU/USD) and USD/MXN forex
 - **Terminal UI:** command line, function keys, watchlist, signals panel
+- **Studies guide:** `guide.html` (F9, the **GUIDE** button or the **?** next to each study) explains every indicator in Spanish. Each card has **▶ VER EN EL CHART**, which opens the terminal with that study on (`/?study=hpdr,ema21`).
 
 ## Run it
 
@@ -41,6 +42,7 @@ Deploy to Netlify by connecting the repo. `netlify.toml` is already set up.
 | **F3** | Studies |
 | **F4** | HPDR on/off |
 | **F8** | Settings |
+| **F9** | Studies guide |
 
 ## Make it yours
 

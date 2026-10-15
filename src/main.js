@@ -368,12 +368,16 @@ const TOGGLES = [
   { key: 'jewel', label: 'JEWEL~ (+AUTOFIB)', color: '#ffa028', pane: true },
 ];
 
+// Each study links to its section of the guide (guide.html), and the guide links back with ?study=
+const GUIDE_ANCHOR = { cross: 'cross', hpdr: 'hpdr', hpdrProject: 'hpdr', bb: 'bb', bbwp: 'bbwp', rsistd: 'rsistd', macd: 'macd', hpdro: 'hpdro', hpdrv: 'hpdrv', stoch: 'stoch', rsi: 'rsidiv', jewel: 'jewel' };
+const guideLink = (anchor) => `<a class="st-help" href="./guide.html#${anchor}" target="_blank" rel="noopener" title="How it works (guide)">?</a>`;
+
 function renderStudies() {
-  const items = MOVING_AVERAGES.map((m) => `<label><input type="checkbox" data-ma="${m.id}" ${state.visible[m.id] ? 'checked' : ''}/>`
-    + `<span class="swatch" style="background:${m.color}"></span>${m.type} ${m.length}</label>`);
+  const items = MOVING_AVERAGES.map((m) => `<div class="st-row"><label><input type="checkbox" data-ma="${m.id}" ${state.visible[m.id] ? 'checked' : ''}/>`
+    + `<span class="swatch" style="background:${m.color}"></span>${m.type} ${m.length}</label>${guideLink(m.type.toLowerCase())}</div>`);
   for (const t of TOGGLES) {
-    items.push(`<label><input type="checkbox" data-opt="${t.key}" data-pane="${t.pane ? 1 : ''}" ${state.on[t.key] ? 'checked' : ''}/>`
-      + `<span class="swatch" style="background:${t.color}"></span>${t.label}</label>`);
+    items.push(`<div class="st-row"><label><input type="checkbox" data-opt="${t.key}" data-pane="${t.pane ? 1 : ''}" ${state.on[t.key] ? 'checked' : ''}/>`
+      + `<span class="swatch" style="background:${t.color}"></span>${t.label}</label>${guideLink(GUIDE_ANCHOR[t.key])}</div>`);
   }
   $('studies').innerHTML = items.join('');
   updateAllButton();
@@ -628,6 +632,7 @@ function openHelp() {
       <tr><td><b>T</b> / <b>H</b> / <b>B</b> / <b>M</b></td><td>Trend line / horizontal line / brush (click and drag) / measure box. <b>Shift + click</b> = quick measure. Pick a neon color in the toolbar (also recolors the selected drawing). Click a drawing + <b>Delete</b> to remove it.</td></tr>
       <tr><td><code>KEY abc123</code></td><td>Set your Twelve Data API key</td></tr>
     </table>
+    <div><a class="amber" href="./guide.html" target="_blank" rel="noopener">▶ STUDIES GUIDE (F9)</a> <span class="dim">— how every indicator works, with a link back to the chart</span></div>
     <div class="dim">Crypto pairs ending in USDT / USDC / BTC… load from Binance (live). Everything else loads from Twelve Data (polled every 60s).<br>
     Cross and divergence signals use closed candles only. HPDR, Stoch, RSI-div and Jewel~ are own implementations built from each indicator's concept and your settings — values can differ from the originals (see README).<br>
     This tool is for analysis, not financial advice.</div>`);
@@ -659,6 +664,7 @@ const actions = {
   F3: () => document.querySelector('#studies input')?.focus(),
   F4: () => toggle('hpdr'),
   F8: openSettings,
+  F9: () => window.open('./guide.html', '_blank', 'noopener'),
 };
 document.addEventListener('keydown', (e) => {
   if (actions[e.key]) { e.preventDefault(); actions[e.key](); }
@@ -674,6 +680,19 @@ function tick() {
   $('clockUtc').textContent = d.toISOString().slice(11, 19) + ' UTC';
 }
 setInterval(tick, 1000); tick();
+
+// ── Links from the guide: ./?study=hpdr,ema21 turns those studies on ──
+(function applyStudyParam() {
+  const params = new URLSearchParams(location.search);
+  const list = (params.get('study') || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (!list.length) return;
+  for (const k of list) {
+    if (k in state.visible) state.visible[k] = true;
+    else if (TOGGLES.some((t) => t.key === k)) state.on[k] = true;
+  }
+  store.set('visible', state.visible); store.set('on', state.on);
+  history.replaceState(null, '', location.pathname); // clean URL so a reload doesn't re-apply it
+})();
 
 // ── Boot ──
 renderStudies();

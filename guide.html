@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PM Terminal · Guía de indicadores</title>
+  <meta name="description" content="Cómo funciona cada study de PM Terminal: medias móviles, HPDR, BBWP, RSI, MACD, Stoch, divergencias y Jewel~." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23000'/><path d='M4 24 L11 15 L17 19 L28 6' stroke='%23ffa028' stroke-width='3' fill='none'/></svg>" />
+</head>
+<body class="guide">
+  <header class="g-top">
+    <a class="brand" href="./" title="Volver al terminal"><span class="brand-tag">PMT</span><span class="brand-name">PM TERMINAL</span></a>
+    <span class="g-title">GUÍA DE INDICADORES</span>
+    <a class="g-back" href="./"><b>◀</b>VOLVER AL CHART</a>
+  </header>
+
+  <div class="g-layout">
+    <nav class="g-nav" aria-label="Contenido">
+      <div class="g-nav-h">SOBRE EL PRECIO</div>
+      <a href="#sma">SMA</a><a href="#ema">EMA</a><a href="#cross">Cruces X▲ X▼</a><a href="#bb">Bollinger</a><a href="#hpdr">HPDR Bands</a><a href="#autofib">AutoFib</a>
+      <div class="g-nav-h">PANELES</div>
+      <a href="#bbwp">BBWP</a><a href="#rsistd">RSI</a><a href="#macd">MACD</a><a href="#hpdro">HPDRO</a><a href="#hpdrv">HPDRV</a><a href="#stoch">Advanced Stoch</a>
+      <div class="g-nav-h">AVANZADO</div>
+      <a href="#rsidiv">RSI Divergence</a><a href="#jewel">Jewel~</a><a href="#combinar">Cómo combinarlos</a>
+    </nav>
+
+    <main class="g-main">
+      <section class="g-intro">
+        <h1>Cómo leer cada study</h1>
+        <p>Cada tarjeta explica qué mide el indicador y cómo leerlo. El botón <span class="amber">▶ VER EN EL CHART</span> abre el terminal con ese study encendido, sobre el símbolo y la temporalidad que ya tenías.</p>
+        <p class="dim">En el terminal, el <b class="amber">?</b> junto a cada study en el panel STUDIES te trae de vuelta aquí.</p>
+      </section>
+
+      <h2 class="g-group">SOBRE EL PRECIO</h2>
+      <p class="g-lead">Estas líneas se dibujan encima de las velas. Dicen hacia dónde va la tendencia y qué tan lejos está el precio de lo normal.</p>
+
+      <article class="card" id="sma">
+        <header><span class="sw" style="background:#ffffff"></span><h3>SMA <span class="dim">9 · 100 · 200</span></h3><a class="go" href="./?study=sma200">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Promedio simple de los últimos N cierres. Todas las velas pesan igual.</dd>
+          <dt>Cómo leerlo</dt><dd>Lenta y estable. La <b>SMA 200</b> es la referencia de tendencia de largo plazo: precio arriba = mercado alcista; abajo = bajista.</dd>
+        </dl>
+      </article>
+
+      <article class="card" id="ema">
+        <header><span class="sw" style="background:linear-gradient(90deg,#ef9a9a,#448aff,#9575cd,#f48fb1,#f5e663,#81c784,#ff8a65)"></span><h3>EMA <span class="dim">5 · 9 · 21 · 34 · 55 · 100 · 200</span></h3><a class="go" href="./?study=ema9,ema21,ema34,ema55,ema100">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Promedio exponencial: las velas recientes pesan más, así que reacciona más rápido que la SMA.</dd>
+          <dt>Cómo leerlo</dt><dd>EMAs ordenadas de rápida a lenta (5 &gt; 9 &gt; 21 &gt; 55…) = tendencia sana. Si se enredan, el mercado está lateral. Suelen funcionar como soporte o resistencia dinámica.</dd>
+        </dl>
+      </article>
+
+      <article class="card" id="cross">
+        <header><span class="sw" style="background:#26d07c"></span><h3>Cruces X▲ / X▼ <span class="dim">SMA 9 × SMA 200</span></h3><a class="go" href="./?study=cross,sma9,sma200">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Marca cuando la SMA 9 cruza la SMA 200. También aparecen en el panel SIGNALS.</dd>
+          <dt>Cómo leerlo</dt><dd><span class="up">X▲</span> = la 9 cruza hacia arriba: impulso alcista. <span class="down">X▼</span> = cruza hacia abajo. Solo se marcan en velas cerradas, así que no desaparecen. Llegan tarde por naturaleza: confirman, no anticipan.</dd>
+        </dl>
+      </article>
+
+      <article class="card" id="bb">
+        <header><span class="sw" style="background:#2196f3"></span><h3>Bollinger <span class="dim">20 · 2</span></h3><a class="go" href="./?study=bb">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>SMA 20 con una banda arriba y otra abajo a 2 desviaciones estándar.</dd>
+          <dt>Cómo leerlo</dt><dd>Bandas angostas = poca volatilidad; suele venir un movimiento fuerte. Precio pegado a la banda superior en tendencia = fuerza, no necesariamente venta.</dd>
+        </dl>
+      </article>
+
+      <article class="card" id="hpdr">
+        <header><span class="sw" style="background:linear-gradient(90deg,#2950ff,#6ef5ff,#5bbf6a,#7dff4f,#ffff55,#f2c14e,#f08a3c,#e8392c)"></span><h3>HPDR Bands <span class="dim">Historical Price Delta Range</span></h3><a class="go" href="./?study=hpdr,hpdrProject">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Toma todos los movimientos pasados de N velas (7 por defecto) y los ordena. Cada banda contiene ese porcentaje de los movimientos: 38.2 %, 50 %, 61.8 %, 78.6 %, 88.3 %, 95 %, 97.5 % y 100 %.</dd>
+          <dt>Cómo leerlo</dt><dd>La línea media es el movimiento típico. Fuera de la banda 95 % o 100 % = movimiento extremo para ese activo y esa temporalidad. La escala a la derecha nombra cada rango y el panel <b>HPDR DELTA</b> dice en cuál está el precio ahora.</dd>
+        </dl>
+        <div class="scale">
+          <span style="--c:#2950ff">38.2</span><span style="--c:#6ef5ff">50</span><span style="--c:#5bbf6a">61.8</span><span style="--c:#7dff4f">78.6</span><span style="--c:#ffff55">88.3</span><span style="--c:#f2c14e">95</span><span style="--c:#f08a3c">97.5</span><span style="--c:#e8392c">100</span>
+          <em class="dim">normal → extremo</em>
+        </div>
+      </article>
+
+      <article class="card" id="autofib">
+        <header><span class="sw" style="background:#ffa028"></span><h3>AutoFib</h3><a class="go" href="./?study=jewel">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Niveles de Fibonacci (0, 23.6, 38.2, 50, 61.8, 78.6, 100) entre el máximo y el mínimo de las últimas 200 velas.</dd>
+          <dt>Cómo leerlo</dt><dd>Zonas donde el precio suele reaccionar en retrocesos. Se enciende junto con Jewel~.</dd>
+        </dl>
+      </article>
+
+      <h2 class="g-group">PANELES DE ABAJO</h2>
+      <p class="g-lead">Son osciladores: miden impulso, volatilidad o qué tan extremo es el movimiento actual, casi siempre en una escala de 0 a 100.</p>
+
+      <article class="card" id="bbwp">
+        <header><span class="sw" style="background:#e8392c"></span><h3>BBWP <span class="dim">13 · 252 · SMA 5</span></h3><a class="go" href="./?study=bbwp">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Qué tan anchas están las Bollinger comparado con las últimas 252 velas. 0 = compresión máxima, 100 = expansión máxima.</dd>
+          <dt>Cómo leerlo</dt><dd><span style="color:#2950ff">Barras azules</span> (≤ 2) avisan que se acerca un movimiento fuerte, sin decir la dirección. <span class="down">Barras rojas</span> (≥ 98) = volatilidad en el extremo; el movimiento suele estar madurando.</dd>
+        </dl>
+      </article>
+
+      <article class="card" id="rsistd">
+        <header><span class="sw" style="background:#7e57c2"></span><h3>RSI 14 <span class="dim">+ SMA 14</span></h3><a class="go" href="./?study=rsistd">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Fuerza de las subidas contra las bajadas, de 0 a 100.</dd>
+          <dt>Cómo leerlo</dt><dd>Arriba de 70 = sobrecompra; abajo de 30 = sobreventa (zona sombreada 30–70). RSI cruzando su SMA hacia arriba = impulso mejorando. En tendencia fuerte el RSI puede quedarse arriba de 70 mucho tiempo.</dd>
+        </dl>
+      </article>
+
+      <article class="card" id="macd">
+        <header><span class="sw" style="background:#2962ff"></span><h3>MACD <span class="dim">12 · 26 · 9</span></h3><a class="go" href="./?study=macd">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Diferencia entre la EMA 12 y la EMA 26, con su línea de señal (EMA 9) y el histograma entre ambas.</dd>
+          <dt>Cómo leerlo</dt><dd>MACD arriba de la señal = impulso alcista. Histograma que se hace más chico = el impulso pierde fuerza. Cruce del cero = cambio de tendencia de fondo.</dd>
+        </dl>
+      </article>
+
+      <article class="card" id="hpdro">
+        <header><span class="sw" style="background:#e84a4a"></span><h3>HPDRO <span class="dim">oscilador · SMA 5</span></h3><a class="go" href="./?study=hpdro">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Percentil (0–100) del movimiento actual de N velas contra todos los anteriores.</dd>
+          <dt>Cómo leerlo</dt><dd>50 = movimiento normal. Cerca de 100 = subida extrema; cerca de 0 = caída extrema. Los puntos de alerta salen al pasar el rango 95 %: zona de posible agotamiento.</dd>
+        </dl>
+      </article>
+
+      <article class="card" id="hpdrv">
+        <header><span class="sw" style="background:#ffffff"></span><h3>HPDRV <span class="dim">volatilidad · SMA 5</span></h3><a class="go" href="./?study=hpdrv">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Percentil del tamaño del movimiento, sin importar si sube o baja.</dd>
+          <dt>Cómo leerlo</dt><dd>Alto = movimiento más violento de lo usual. Bajo = mercado tranquilo. Sirve para saber si hay que esperar stops más amplios.</dd>
+        </dl>
+      </article>
+
+      <article class="card" id="stoch">
+        <header><span class="sw" style="background:#00d7ff"></span><h3>Advanced Stoch <span class="dim">14 · 6 · 3</span></h3><a class="go" href="./?study=stoch">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Estocástico: dónde cierra el precio dentro de su rango de 14 velas. Trae un pronóstico punteado de 3 velas y una línea de volatilidad estocástica de colores.</dd>
+          <dt>Cómo leerlo</dt><dd><span style="color:#00d7ff">K</span> arriba de 80 = parte alta del rango; abajo de 20 = parte baja. Cruce de K con <span class="amber">D</span> en esos extremos = posible giro. El pronóstico es una extrapolación, no una predicción.</dd>
+        </dl>
+      </article>
+
+      <h2 class="g-group">AVANZADO</h2>
+
+      <article class="card" id="rsidiv">
+        <header><span class="sw" style="background:#7dff4f"></span><h3>RSI Divergence <span class="dim">Cutler RSI 14 · SMA 12</span></h3><a class="go" href="./?study=rsi">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Una divergencia es cuando el precio y el RSI no están de acuerdo: el precio hace un nuevo máximo o mínimo y el RSI no lo confirma.</dd>
+          <dt>Pivotes</dt><dd>Un mínimo o máximo cuenta como pivote cuando es el más extremo entre 5 velas a la izquierda y 3 a la derecha. Por eso la divergencia aparece 3 velas después y no se repinta. Se compara con el pivote anterior dentro de las últimas 50 velas.</dd>
+        </dl>
+
+        <div class="divs">
+          <figure>
+            <svg viewBox="0 0 160 120" role="img" aria-label="Regular alcista: precio hace mínimo más bajo, RSI mínimo más alto">
+              <text x="4" y="12">PRECIO</text>
+              <polyline class="px" points="8,30 30,58 48,40 70,46 96,72 118,50 150,36"/>
+              <line x1="30" y1="58" x2="96" y2="72" stroke="#7dff4f"/>
+              <text x="4" y="78">RSI</text>
+              <polyline class="px" points="8,86 30,112 48,94 70,98 96,102 118,92 150,84"/>
+              <line x1="30" y1="112" x2="96" y2="102" stroke="#7dff4f"/>
+            </svg>
+            <figcaption><b style="color:#7dff4f">Regular alcista</b>Precio: mínimo más bajo · RSI: mínimo más alto. La caída pierde fuerza; posible rebote.</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="0 0 160 120" role="img" aria-label="Regular bajista: precio hace máximo más alto, RSI máximo más bajo">
+              <text x="4" y="12">PRECIO</text>
+              <polyline class="px" points="8,60 30,32 48,50 70,44 96,20 118,40 150,56"/>
+              <line x1="30" y1="32" x2="96" y2="20" stroke="#e8392c"/>
+              <text x="4" y="78">RSI</text>
+              <polyline class="px" points="8,108 30,84 48,100 70,96 96,92 118,100 150,110"/>
+              <line x1="30" y1="84" x2="96" y2="92" stroke="#e8392c"/>
+            </svg>
+            <figcaption><b style="color:#e8392c">Regular bajista</b>Precio: máximo más alto · RSI: máximo más bajo. La subida pierde fuerza; posible corrección.</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="0 0 160 120" role="img" aria-label="Oculta alcista: precio hace mínimo más alto, RSI mínimo más bajo">
+              <text x="4" y="12">PRECIO</text>
+              <polyline class="px" points="8,50 30,66 48,40 70,30 96,52 118,34 150,20"/>
+              <line x1="30" y1="66" x2="96" y2="52" stroke="#2950ff" stroke-dasharray="4 3"/>
+              <text x="4" y="78">RSI</text>
+              <polyline class="px" points="8,96 30,102 48,90 70,86 96,112 118,92 150,84"/>
+              <line x1="30" y1="102" x2="96" y2="112" stroke="#2950ff" stroke-dasharray="4 3"/>
+            </svg>
+            <figcaption><b style="color:#5b7cff">Oculta alcista</b>Precio: mínimo más alto · RSI: mínimo más bajo. Retroceso dentro de tendencia alcista; probable continuación.</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="0 0 160 120" role="img" aria-label="Oculta bajista: precio hace máximo más bajo, RSI máximo más alto">
+              <text x="4" y="12">PRECIO</text>
+              <polyline class="px" points="8,22 30,20 48,44 70,52 96,34 118,52 150,66"/>
+              <line x1="30" y1="20" x2="96" y2="34" stroke="#f08a3c" stroke-dasharray="4 3"/>
+              <text x="4" y="78">RSI</text>
+              <polyline class="px" points="8,94 30,92 48,102 70,108 96,82 118,100 150,110"/>
+              <line x1="30" y1="92" x2="96" y2="82" stroke="#f08a3c" stroke-dasharray="4 3"/>
+            </svg>
+            <figcaption><b style="color:#f08a3c">Oculta bajista</b>Precio: máximo más bajo · RSI: máximo más alto. Rebote dentro de tendencia bajista; probable continuación.</figcaption>
+          </figure>
+        </div>
+        <p class="note">Las <b>regulares</b> avisan posible <b>giro</b>; las <b>ocultas</b> avisan <b>continuación</b>. Una divergencia sola no es entrada: pesa más cuando coincide con un soporte, una banda HPDR extrema o un RSI en sobrecompra o sobreventa.</p>
+      </article>
+
+      <article class="card" id="jewel">
+        <header><span class="sw" style="background:#ffa028"></span><h3>Jewel~ <span class="dim">+ AutoFib</span></h3><a class="go" href="./?study=jewel">▶ VER EN EL CHART</a></header>
+        <dl>
+          <dt>Qué es</dt><dd>Junta impulso, tendencia y fuerza en un solo panel. Es una interpretación propia del concepto; los valores pueden diferir del script original.</dd>
+          <dt>Fast</dt><dd>RSI 14: impulso inmediato.</dd>
+          <dt>Slow</dt><dd>EMA 9 del Fast. Fast cruzando Slow hacia arriba = impulso girando al alza; hacia abajo = a la baja.</dd>
+          <dt>High</dt><dd>ADX ajustado por el DMI: qué tan fuerte es la tendencia, no su dirección. Alto = tendencia con fuerza; bajo = mercado sin dirección.</dd>
+          <dt>Tira en 110</dt><dd>EMA 21 contra EMA 55: <span class="up">verde</span> si la 21 va arriba, <span class="down">roja</span> si va abajo. El fondo sombreado marca los cruces.</dd>
+          <dt>Lectura rápida</dt><dd>Tira verde + Fast arriba de Slow + High subiendo = tendencia alcista con fuerza.</dd>
+        </dl>
+      </article>
+
+      <article class="card combine" id="combinar">
+        <header><span class="sw" style="background:var(--amber)"></span><h3>Cómo combinarlos</h3><a class="go" href="./?study=sma200,ema21,hpdr,bbwp,rsi">▶ VER COMBINACIÓN</a></header>
+        <p>Ningún indicador sirve solo; la idea es que varios coincidan. Un orden práctico:</p>
+        <ol class="steps">
+          <li><b>Tendencia.</b> Precio contra la <a href="#sma">SMA 200</a> y el orden de las <a href="#ema">EMAs</a>. Define si buscas compras, ventas o mejor esperar.</li>
+          <li><b>Volatilidad.</b> <a href="#bbwp">BBWP</a> en azul = se acerca un movimiento; en rojo = movimiento ya extendido.</li>
+          <li><b>Qué tan extremo está.</b> <a href="#hpdr">HPDR Bands</a> y <a href="#hpdro">HPDRO</a>. Fuera del 95 % = poco espacio para seguir sin una pausa.</li>
+          <li><b>Señal.</b> <a href="#rsidiv">Divergencia del RSI</a>, cruce del <a href="#stoch">Stoch</a> en extremo, cruce del <a href="#macd">MACD</a> o Fast/Slow del <a href="#jewel">Jewel~</a>.</li>
+          <li><b>Nivel.</b> Que la señal ocurra en un soporte, un nivel <a href="#autofib">AutoFib</a> o una EMA importante.</li>
+        </ol>
+        <div class="examples">
+          <div><b class="up">Rebote probable</b>Precio sobre SMA 200, tocando la banda HPDR inferior 95 %, divergencia regular alcista y Stoch cruzando arriba desde 20.</div>
+          <div><b class="down">Agotamiento</b>BBWP en rojo, HPDRO arriba de 95 con puntos de alerta, divergencia regular bajista y MACD perdiendo histograma.</div>
+          <div><b style="color:#00d7ff">Continuación</b>EMAs ordenadas al alza, divergencia oculta alcista en un retroceso a la EMA 21 y tira del Jewel~ en verde.</div>
+        </div>
+        <p class="note">Confirma en una temporalidad mayor (por ejemplo 4H para una entrada en 15m) y usa velas cerradas.</p>
+      </article>
+
+      <footer class="g-foot">
+        <p>Herramienta de análisis, no asesoría financiera. HPDR, Advanced Stoch, CT RSI Div y Jewel~ son implementaciones propias a partir del concepto de cada indicador; sus valores pueden diferir de los scripts originales.</p>
+        <p><a class="amber" href="./">◀ Volver al chart</a> · <a class="amber" id="gMail" href="#">Feedback / bugs</a> · Gráficas por <a class="amber" href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView Lightweight Charts</a></p>
+      </footer>
+    </main>
+  </div>
+
+  <script type="module" src="/src/guide.js"></script>
+</body>
+</html>
