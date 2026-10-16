@@ -43,6 +43,8 @@ Deploy to Netlify by connecting the repo. `netlify.toml` is already set up.
 | **F4** | HPDR on/off |
 | **F8** | Settings |
 | **F9** | Studies guide |
+| **Ctrl/⌘ + Z** / **↶** | Undo the last drawing change (Ctrl/⌘ + Shift + Z = redo) |
+| **P** or **HIDE PANEL** | Hide / show the right panel (watchlist, studies, signals) |
 
 ## Make it yours
 

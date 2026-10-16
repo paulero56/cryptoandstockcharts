@@ -629,6 +629,8 @@ function openHelp() {
       <tr><td><code>CLEAR</code></td><td>All studies off with one click — again to restore them (same as the ALL OFF button)</td></tr>
       <tr><td><code>ADD PEPEUSDT</code> <code>DEL COIN</code></td><td>Add / remove a watchlist symbol (or use the box under the watchlist)</td></tr>
       <tr><td><code>5D</code> <code>2W</code> <code>3M</code> <code>1Y</code></td><td>5-day, 2-week, quarterly and yearly candles (built from daily / weekly / monthly data)</td></tr>
+      <tr><td><b>Ctrl/⌘ + Z</b></td><td>Undo the last drawing change (or the ↶ button). <b>Ctrl/⌘ + Shift + Z</b> = redo. The trash can is undoable too.</td></tr>
+      <tr><td><b>P</b></td><td>Hide / show the right panel (or the HIDE PANEL button, top right)</td></tr>
       <tr><td><b>T</b> / <b>H</b> / <b>B</b> / <b>M</b></td><td>Trend line / horizontal line / brush (click and drag) / measure box. <b>Shift + click</b> = quick measure. Pick a neon color in the toolbar (also recolors the selected drawing). Click a drawing + <b>Delete</b> to remove it.</td></tr>
       <tr><td><code>KEY abc123</code></td><td>Set your Twelve Data API key</td></tr>
     </table>
@@ -656,6 +658,18 @@ function openSettings(reason = '') {
     else if (sourceFor(state.symbol) !== 'binance') load(state.symbol, state.interval);
   };
 }
+
+// ── Hide / show the right panel (watchlist, studies, signals) ──
+function setSideHidden(hidden) {
+  document.querySelector('.main').classList.toggle('side-hidden', hidden);
+  $('sideToggle').innerHTML = hidden ? '◀ SHOW PANEL' : 'HIDE PANEL ▶';
+  store.set('sideHidden', hidden);
+}
+setSideHidden(store.get('sideHidden', false));
+$('sideToggle').addEventListener('click', () => setSideHidden(!store.get('sideHidden', false)));
+document.addEventListener('keydown', (e) => {
+  if ((e.key === 'p' || e.key === 'P') && !e.metaKey && !e.ctrlKey && document.activeElement.tagName !== 'INPUT') setSideHidden(!store.get('sideHidden', false));
+});
 
 // ── Function keys (keyboard + footer buttons) ──
 const actions = {

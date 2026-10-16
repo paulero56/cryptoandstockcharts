@@ -7,6 +7,8 @@
 //  click-and-drag for the brush). Shift + click = quick measure.
 //  Pick a color from the palette (it also recolors the selected drawing).
 //  Click a drawing to select it, Delete/⌫ removes it. Esc cancels.
+//  Undo (↶ button or Ctrl/⌘ + Z) steps back one change at a time;
+//  Ctrl/⌘ + Shift + Z (or Ctrl + Y) redoes it.
 // ─────────────────────────────────────────────────────────────
 
 export const NEON = ['#39ff14', '#00f0ff', '#ff2bd6', '#ffff00', '#ff6a00', '#ff1744', '#ffffff'];
@@ -38,6 +40,11 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
   palette.className = 'palette';
   palette.innerHTML = NEON.map((c) => `<button class="swatch-btn" data-color="${c}" title="Color" style="--c:${c}"></button>`).join('');
   toolbar.appendChild(palette);
+  const undoBtn = document.createElement('button');
+  undoBtn.dataset.act = 'undo';
+  undoBtn.title = 'Undo last drawing change (Ctrl/⌘ + Z)';
+  undoBtn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M5.5 3.5 2.5 6.5l3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 6.5h6.5a3.5 3.5 0 0 1 0 7H6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  (toolbar.querySelector('[data-act="clear"]') || palette).before(undoBtn);
   function renderPalette() {
     palette.querySelectorAll('[data-color]').forEach((b) => b.classList.toggle('on', b.dataset.color === color));
   }
@@ -67,7 +74,7 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     if (exact) { // fractional time (seconds) — used by the brush
       const i = Math.max(0, Math.min(last, Math.floor(lf))), f = lf - i;
       const next = i < last ? toSec(c[i + 1].time) : toSec(c[i].time) + getStep();
-      return { time: Math.round(toSec(c[i].time) + (lf > last ? (lf - last) * getStep() : f * (next - toSec(c[i].time)))), price };
+      return { time: +(toSec(c[i].time) + (lf > last ? (lf - last) * getStep() : f * (next - toSec(c[i].time)))).toFixed(2), price };
     }
     const l = Math.round(lf);
     let time;
@@ -112,6 +119,16 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     ctx.shadowColor = col; ctx.shadowBlur = 10; ctx.strokeStyle = col; ctx.lineWidth = width; path(); ctx.stroke();
     ctx.restore();
   }
+  // Smooth curve through the points (Catmull-Rom spline as Bézier segments): no visible corners
+  function smoothPath(ctx, pts) {
+    ctx.beginPath(); ctx.moveTo(...pts[0]);
+    if (pts.length === 2) { ctx.lineTo(...pts[1]); return; }
+    for (let k = 0; k < pts.length - 1; k++) {
+      const p0 = pts[k - 1] || pts[k], p1 = pts[k], p2 = pts[k + 1], p3 = pts[k + 2] || p2;
+      ctx.bezierCurveTo(p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6,
+        p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6, p2[0], p2[1]);
+    }
+  }
   function arrow(ctx, x1, y1, x2, y2) {
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
     const a = Math.atan2(y2 - y1, x2 - x1);
@@ -139,7 +156,7 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     if (dr.type === 'brush') {
       const pts = dr.pts.map((p) => [xOf(p.time), yOf(p.price)]).filter(([x, y]) => x != null && y != null);
       if (pts.length < 2) return;
-      neon(ctx, () => { ctx.beginPath(); pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); }, col, w);
+      neon(ctx, () => smoothPath(ctx, pts), col, w);
       if (isSel) { handle(ctx, ...pts[0], col); handle(ctx, ...pts.at(-1), col); }
       return;
     }
@@ -186,10 +203,27 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
   series.attachPrimitive(primitive);
   const redraw = () => primitive._request?.();
 
-  // ── persistence ──
+  // ── persistence + undo/redo (per symbol, last 100 changes) ──
+  let undoStack = [], redoStack = [];
+  const snapshot = () => JSON.stringify(drawings);
   const save = () => symbolKey && store.set('draw:' + symbolKey, drawings);
+  function commit(change) { // record the state before a change, then apply it
+    undoStack.push(snapshot()); if (undoStack.length > 100) undoStack.shift();
+    redoStack = [];
+    change(); save(); updateUndo(); redraw();
+  }
+  function restore(from, to) {
+    if (!from.length) return;
+    to.push(snapshot());
+    drawings = JSON.parse(from.pop()); selected = null; pending = null;
+    save(); updateUndo(); redraw();
+  }
+  const undo = () => restore(undoStack, redoStack);
+  const redo = () => restore(redoStack, undoStack);
+  function updateUndo() { undoBtn.disabled = !undoStack.length; }
   function setSymbol(sym) {
-    symbolKey = sym; drawings = store.get('draw:' + sym, []); selected = null; pending = null; stroke = null; redraw();
+    symbolKey = sym; drawings = store.get('draw:' + sym, []); selected = null; pending = null; stroke = null;
+    undoStack = []; redoStack = []; updateUndo(); redraw();
   }
 
   // ── hit testing ──
@@ -237,10 +271,14 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     if (b.dataset.tool) setTool(b.dataset.tool);
     if (b.dataset.color) {
       color = b.dataset.color; store.set('drawColor', color); renderPalette();
-      if (selected && selected.type !== 'measure') { selected.color = color; save(); }
+      if (selected && selected.type !== 'measure' && selected.color !== color) {
+        const i = drawings.indexOf(selected);
+        commit(() => { drawings[i].color = color; });
+      }
       redraw();
     }
-    if (b.dataset.act === 'clear' && drawings.length) { drawings = []; selected = null; save(); redraw(); }
+    if (b.dataset.act === 'undo') undo();
+    if (b.dataset.act === 'clear' && drawings.length) commit(() => { drawings = []; selected = null; }); // undo brings them back
   });
 
   // ── brush: press, drag, release ──
@@ -260,28 +298,40 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
   }, true);
   chartEl.addEventListener('pointermove', (e) => {
     if (!stroke) return;
-    const pt = localPoint(e);
-    if (Math.hypot(pt.x - stroke.last.x, pt.y - stroke.last.y) < 3) return;
-    const a = anchorAt(pt, true); if (!a) return;
-    stroke.pts.push(a); stroke.last = pt; redraw();
+    e.preventDefault(); e.stopPropagation();
+    // the browser groups fast mouse moves into one event — use every sample so curves stay round
+    const evs = e.getCoalescedEvents?.().length ? e.getCoalescedEvents() : [e];
+    for (const ev of evs) {
+      const pt = localPoint(ev);
+      if (Math.hypot(pt.x - stroke.last.x, pt.y - stroke.last.y) < 2) continue;
+      const a = anchorAt(pt, true); if (!a) continue;
+      stroke.pts.push(a); stroke.last = pt;
+    }
+    redraw();
   }, true);
   const endStroke = () => {
     if (!stroke) return;
-    if (stroke.pts.length > 1) drawings.push({ type: 'brush', color: stroke.color, pts: stroke.pts });
-    stroke = null; save(); redraw();
+    const s = stroke; stroke = null;
+    if (s.pts.length > 1) commit(() => drawings.push({ type: 'brush', color: s.color, pts: s.pts }));
+    else redraw();
   };
   chartEl.addEventListener('pointerup', endStroke, true);
 
   // Finish a 2-click drawing on our own pointer events too: the chart library can
   // swallow a quick 2nd click (it treats it as a double-click), which felt flaky.
   let downAt = null, finishedAt = 0;
+  function finish(a) {
+    const { startedAt, ...dr } = pending; pending = null; finishedAt = Date.now();
+    commit(() => drawings.push({ ...dr, p2: a }));
+    setTool('cursor');
+  }
   chartEl.addEventListener('pointerdown', (e) => { downAt = localPoint(e); }, true);
   chartEl.addEventListener('pointerup', (e) => {
     const pt = localPoint(e);
     if (!pending || !downAt || Math.hypot(pt.x - downAt.x, pt.y - downAt.y) > 5 || !inPricePane(pt)) return;
     if (Date.now() - pending.startedAt < 150) return; // this is the click that started it
     const a = anchorAt(pt);
-    if (a) { drawings.push({ ...pending, p2: a }); delete drawings.at(-1).startedAt; pending = null; finishedAt = Date.now(); save(); setTool('cursor'); }
+    if (a) { finish(a); }
   }, true);
   chartEl.addEventListener('pointercancel', endStroke, true);
 
@@ -290,11 +340,11 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     const a = anchorAt(p.point);
     if (!a) return;
     if (pending) {
-      drawings.push({ ...pending, p2: a }); delete drawings.at(-1).startedAt; pending = null; finishedAt = Date.now(); save(); setTool('cursor'); return;
+      finish(a); return;
     }
     const shift = p.sourceEvent?.shiftKey || shiftDown;
     const t = tool === 'cursor' && shift ? 'measure' : tool;
-    if (t === 'hline') { drawings.push({ type: 'hline', color, p1: a }); save(); setTool('cursor'); return; }
+    if (t === 'hline') { commit(() => drawings.push({ type: 'hline', color, p1: a })); setTool('cursor'); return; }
     if (t === 'trend' || t === 'measure') { pending = { type: t, color, p1: a, startedAt: Date.now() }; hover = a; redraw(); return; }
     selected = hit(p.point);
     if (selected?.color) { color = selected.color; renderPalette(); }
@@ -304,7 +354,7 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
   chart.subscribeDblClick((p) => {
     if (!pending || !p.point) return;
     const a = anchorAt(p.point);
-    if (a) { drawings.push({ ...pending, p2: a }); delete drawings.at(-1).startedAt; pending = null; finishedAt = Date.now(); save(); setTool('cursor'); }
+    if (a) { finish(a); }
   });
   chart.subscribeCrosshairMove((p) => {
     if (!pending || !p.point) return;
@@ -317,11 +367,16 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     if (e.key === 'Escape') { pending = null; selected = null; stroke = null; setTool('cursor'); }
     if ((e.key === 'Delete' || e.key === 'Backspace') && selected) {
       e.preventDefault();
-      drawings = drawings.filter((d) => d !== selected); selected = null; save(); redraw();
+      const gone = selected; selected = null;
+      commit(() => { drawings = drawings.filter((d) => d !== gone); });
     }
+    const z = e.key.toLowerCase() === 'z' && (e.metaKey || e.ctrlKey);
+    if (z && !e.shiftKey) { e.preventDefault(); undo(); return; }
+    if ((z && e.shiftKey) || (e.ctrlKey && e.key.toLowerCase() === 'y')) { e.preventDefault(); redo(); return; }
     const keys = { t: 'trend', h: 'hline', m: 'measure', b: 'brush' };
     if (!e.metaKey && !e.ctrlKey && keys[e.key]) setTool(keys[e.key]);
   });
 
-  return { setSymbol, redraw, setTool, count: () => drawings.length };
+  updateUndo();
+  return { setSymbol, redraw, setTool, undo, redo, count: () => drawings.length };
 }

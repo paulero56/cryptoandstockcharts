@@ -64,6 +64,13 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .msg.show { display: grid; }
 
 .side { display: flex; flex-direction: column; min-height: 0; overflow: auto; }
+.main.side-hidden { grid-template-columns: 1fr; }
+.main.side-hidden .side { display: none; }
+.main.side-hidden .chart-wrap { border-right: 0; }
+.side-toggle { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: 1px; color: var(--amber); border: 1px solid var(--line-2); padding: 3px 8px; white-space: nowrap; }
+.side-toggle:hover { border-color: var(--amber); }
+.tools button:disabled { opacity: .3; cursor: default; }
+.tools button:disabled:hover { border-color: transparent; color: var(--dim); }
 .panel { border-bottom: 1px solid var(--line-2); padding-bottom: 6px; }
 .panel.grow { flex: 1; }
 .panel-h { display: flex; justify-content: space-between; align-items: center; background: #111; color: var(--amber); font-weight: 600; letter-spacing: 1px; padding: 3px 10px; font-size: 12px; }
