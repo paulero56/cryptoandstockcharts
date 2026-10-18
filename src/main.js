@@ -629,9 +629,10 @@ function openHelp() {
       <tr><td><code>CLEAR</code></td><td>All studies off with one click — again to restore them (same as the ALL OFF button)</td></tr>
       <tr><td><code>ADD PEPEUSDT</code> <code>DEL COIN</code></td><td>Add / remove a watchlist symbol (or use the box under the watchlist)</td></tr>
       <tr><td><code>5D</code> <code>2W</code> <code>3M</code> <code>1Y</code></td><td>5-day, 2-week, quarterly and yearly candles (built from daily / weekly / monthly data)</td></tr>
+      <tr><td><b>N</b></td><td>Text: click on the chart, type, <b>Enter</b> to place. Double-click a text (or select it + Enter) to edit it; empty it to delete.</td></tr>
       <tr><td><b>Ctrl/⌘ + Z</b></td><td>Undo the last drawing change (or the ↶ button). <b>Ctrl/⌘ + Shift + Z</b> = redo. The trash can is undoable too.</td></tr>
       <tr><td><b>P</b></td><td>Hide / show the right panel (or the HIDE PANEL button, top right)</td></tr>
-      <tr><td><b>T</b> / <b>H</b> / <b>B</b> / <b>M</b></td><td>Trend line / horizontal line / brush (click and drag) / measure box. <b>Shift + click</b> = quick measure. Pick a neon color in the toolbar (also recolors the selected drawing). Click a drawing + <b>Delete</b> to remove it.</td></tr>
+      <tr><td><b>T</b> / <b>H</b> / <b>B</b> / <b>N</b> / <b>M</b></td><td>Trend line / horizontal line / brush (click and drag) / text / measure box. <b>Shift + click</b> = quick measure. Pick a neon color in the toolbar (also recolors the selected drawing). Click a drawing + <b>Delete</b> to remove it.</td></tr>
       <tr><td><code>KEY abc123</code></td><td>Set your Twelve Data API key</td></tr>
     </table>
     <div><a class="amber" href="./guide.html" target="_blank" rel="noopener">▶ STUDIES GUIDE (F9)</a> <span class="dim">— how every indicator works, with a link back to the chart</span></div>

@@ -7,6 +7,8 @@
 //  click-and-drag for the brush). Shift + click = quick measure.
 //  Pick a color from the palette (it also recolors the selected drawing).
 //  Click a drawing to select it, Delete/⌫ removes it. Esc cancels.
+//  Text: pick the T tool (N), click where it goes, type, Enter to place.
+//  Double-click a text (or select it + Enter) to edit it.
 //  Undo (↶ button or Ctrl/⌘ + Z) steps back one change at a time;
 //  Ctrl/⌘ + Shift + Z (or Ctrl + Y) redoes it.
 // ─────────────────────────────────────────────────────────────
@@ -36,6 +38,11 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
   brushBtn.title = 'Brush — freehand drawing (B)';
   brushBtn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M2 13c2 0 3-1 3-2.5S6 8 7.5 8 10 9.5 10 11 9 14 6 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M9 9l5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   toolbar.querySelector('[data-tool="hline"]')?.after(brushBtn);
+  const textBtn = document.createElement('button');
+  textBtn.dataset.tool = 'text';
+  textBtn.title = 'Text — click on the chart and type (N)';
+  textBtn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M3 3.5h10M8 3.5V13M6 13h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+  brushBtn.after(textBtn);
   const palette = document.createElement('div');
   palette.className = 'palette';
   palette.innerHTML = NEON.map((c) => `<button class="swatch-btn" data-color="${c}" title="Color" style="--c:${c}"></button>`).join('');
@@ -119,6 +126,17 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     ctx.shadowColor = col; ctx.shadowBlur = 10; ctx.strokeStyle = col; ctx.lineWidth = width; path(); ctx.stroke();
     ctx.restore();
   }
+  // Text drawings: anchored at (time, price) on the left-middle of the first line
+  const TEXT_FONT = '700 15px "IBM Plex Mono", monospace', TEXT_LINE = 19;
+  let measureCtx = null;
+  function textBox(ctx, dr, x, y) {
+    const c = ctx || (measureCtx ||= document.createElement('canvas').getContext('2d'));
+    c.save(); c.font = TEXT_FONT;
+    const lines = dr.text.split('\n');
+    const w = Math.max(...lines.map((l) => c.measureText(l).width));
+    c.restore();
+    return { l: x, t: y - TEXT_LINE / 2, w, h: lines.length * TEXT_LINE };
+  }
   // Smooth curve through the points (Catmull-Rom spline as Bézier segments): no visible corners
   function smoothPath(ctx, pts) {
     ctx.beginPath(); ctx.moveTo(...pts[0]);
@@ -151,6 +169,21 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
       const last = getCandles().at(-1)?.close;
       const dist = last ? ((dr.p1.price - last) / last) * 100 : 0;
       label(ctx, `${fmt(dr.p1.price)}  ${pctStr(dist)}`, size.width - 6, y - 22, col, 'right', '#000');
+      return;
+    }
+    if (dr.type === 'text') {
+      const x = xOf(dr.p1.time), y = yOf(dr.p1.price); if (x == null || y == null || dr === editing) return;
+      const box = textBox(ctx, dr, x, y);
+      ctx.save();
+      ctx.font = TEXT_FONT; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(box.l - 4, box.t - 3, box.w + 8, box.h + 6); // keeps it readable over busy bands
+      if (isSel) { ctx.strokeStyle = col; ctx.setLineDash([4, 3]); ctx.lineWidth = 1; ctx.strokeRect(box.l - 4, box.t - 3, box.w + 8, box.h + 6); ctx.setLineDash([]); }
+      dr.text.split('\n').forEach((line, k) => {
+        const ly = y + k * TEXT_LINE;
+        ctx.strokeStyle = 'rgba(0,0,0,.9)'; ctx.lineWidth = 4; ctx.strokeText(line, x, ly);
+        ctx.shadowColor = col; ctx.shadowBlur = 8; ctx.fillStyle = col; ctx.fillText(line, x, ly); ctx.shadowBlur = 0;
+      });
+      ctx.restore();
       return;
     }
     if (dr.type === 'brush') {
@@ -236,6 +269,12 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     const near = 7;
     for (const dr of [...drawings].reverse()) {
       if (dr.type === 'hline') { const y = yOf(dr.p1.price); if (y != null && Math.abs(point.y - y) < near) return dr; continue; }
+      if (dr.type === 'text') {
+        const x = xOf(dr.p1.time), y = yOf(dr.p1.price); if (x == null || y == null) continue;
+        const b = textBox(null, dr, x, y);
+        if (point.x >= b.l - 4 && point.x <= b.l + b.w + 4 && point.y >= b.t - 4 && point.y <= b.t + b.h + 4) return dr;
+        continue;
+      }
       if (dr.type === 'brush') {
         const pts = dr.pts.map((q) => [xOf(q.time), yOf(q.price)]);
         for (let k = 1; k < pts.length; k++) {
@@ -281,6 +320,41 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     if (b.dataset.act === 'clear' && drawings.length) commit(() => { drawings = []; selected = null; }); // undo brings them back
   });
 
+  // ── text editor: a small input placed on the chart where you clicked ──
+  let editing = null;
+  const editor = document.createElement('input');
+  editor.className = 'draw-text-input';
+  editor.placeholder = 'Type… Enter ✓  Esc ✕';
+  editor.spellcheck = false;
+  editor.hidden = true;
+  chartEl.parentElement.appendChild(editor);
+  function openEditor(dr, isNew) {
+    editing = dr; editing.isNew = isNew;
+    const x = xOf(dr.p1.time), y = yOf(dr.p1.price);
+    editor.style.left = `${chartEl.offsetLeft + x - 6}px`;
+    editor.style.top = `${chartEl.offsetTop + y - 14}px`;
+    editor.style.setProperty('--c', dr.color);
+    editor.value = dr.text || '';
+    fitEditor(); editor.hidden = false; redraw();
+    setTimeout(() => { editor.focus(); editor.select(); }, 0);
+  }
+  function closeEditor(ok) {
+    if (!editing) return;
+    const dr = editing, val = editor.value.trim(); editing = null; editor.hidden = true; editor.blur();
+    if (ok && val && dr.isNew) commit(() => drawings.push({ type: 'text', color: dr.color, p1: dr.p1, text: val }));
+    else if (ok && val && val !== dr.text) { const i = drawings.indexOf(dr); commit(() => { drawings[i].text = val; }); }
+    else if (ok && !val && !dr.isNew) { commit(() => { drawings = drawings.filter((d) => d !== dr); }); }
+    delete dr.isNew; redraw();
+  }
+  const fitEditor = () => { editor.style.width = `${Math.max(14, editor.value.length + 3)}ch`; };
+  editor.addEventListener('input', fitEditor);
+  editor.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); closeEditor(true); }
+    if (e.key === 'Escape') { e.preventDefault(); closeEditor(false); }
+  });
+  editor.addEventListener('blur', () => closeEditor(true));
+
   // ── brush: press, drag, release ──
   const localPoint = (e) => { const r = chartEl.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
   const inPricePane = (pt) => {
@@ -317,44 +391,39 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
   };
   chartEl.addEventListener('pointerup', endStroke, true);
 
-  // Finish a 2-click drawing on our own pointer events too: the chart library can
-  // swallow a quick 2nd click (it treats it as a double-click), which felt flaky.
-  let downAt = null, finishedAt = 0;
+  // Clicks come from our own pointer events, not from the chart library: the library
+  // drops or merges quick clicks (< 0.5 s apart become a "double-click"), which made
+  // lines and horizontal lines fail at random. A click = press + release within 5 px.
+  let downAt = null;
   function finish(a) {
-    const { startedAt, ...dr } = pending; pending = null; finishedAt = Date.now();
+    const { startedAt, ...dr } = pending; pending = null;
     commit(() => drawings.push({ ...dr, p2: a }));
     setTool('cursor');
   }
-  chartEl.addEventListener('pointerdown', (e) => { downAt = localPoint(e); }, true);
-  chartEl.addEventListener('pointerup', (e) => {
-    const pt = localPoint(e);
-    if (!pending || !downAt || Math.hypot(pt.x - downAt.x, pt.y - downAt.y) > 5 || !inPricePane(pt)) return;
-    if (Date.now() - pending.startedAt < 150) return; // this is the click that started it
-    const a = anchorAt(pt);
-    if (a) { finish(a); }
-  }, true);
-  chartEl.addEventListener('pointercancel', endStroke, true);
-
-  chart.subscribeClick((p) => {
-    if (!p.point || tool === 'brush' || Date.now() - finishedAt < 400) return;
-    const a = anchorAt(p.point);
+  function onClick(point, shift) {
+    const a = anchorAt(point);
     if (!a) return;
-    if (pending) {
-      finish(a); return;
-    }
-    const shift = p.sourceEvent?.shiftKey || shiftDown;
+    if (pending) { finish(a); return; }
     const t = tool === 'cursor' && shift ? 'measure' : tool;
     if (t === 'hline') { commit(() => drawings.push({ type: 'hline', color, p1: a })); setTool('cursor'); return; }
-    if (t === 'trend' || t === 'measure') { pending = { type: t, color, p1: a, startedAt: Date.now() }; hover = a; redraw(); return; }
-    selected = hit(p.point);
+    if (t === 'text') { setTool('cursor'); openEditor({ type: 'text', color, p1: a, text: '' }, true); return; }
+    if (t === 'trend' || t === 'measure') { pending = { type: t, color, p1: a }; hover = a; redraw(); return; }
+    selected = hit(point);
     if (selected?.color) { color = selected.color; renderPalette(); }
     redraw();
-  });
-  // a fast 2nd click can arrive as a double-click — still finish the drawing
-  chart.subscribeDblClick((p) => {
-    if (!pending || !p.point) return;
-    const a = anchorAt(p.point);
-    if (a) { finish(a); }
+  }
+  chartEl.addEventListener('pointerdown', (e) => { downAt = e.button === 0 ? localPoint(e) : null; }, true);
+  chartEl.addEventListener('pointerup', (e) => {
+    const pt = localPoint(e), from = downAt; downAt = null;
+    if (!from || tool === 'brush' || editing || Math.hypot(pt.x - from.x, pt.y - from.y) > 5 || !inPricePane(pt)) return;
+    onClick(pt, e.shiftKey || shiftDown);
+  }, true);
+  chartEl.addEventListener('pointercancel', endStroke, true);
+  // double-click a text (cursor tool) to edit it
+  chartEl.addEventListener('dblclick', (e) => {
+    if (tool !== 'cursor' || pending || editing) return;
+    const d = hit(localPoint(e));
+    if (d?.type === 'text') { selected = d; openEditor(d, false); }
   });
   chart.subscribeCrosshairMove((p) => {
     if (!pending || !p.point) return;
@@ -373,7 +442,8 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     const z = e.key.toLowerCase() === 'z' && (e.metaKey || e.ctrlKey);
     if (z && !e.shiftKey) { e.preventDefault(); undo(); return; }
     if ((z && e.shiftKey) || (e.ctrlKey && e.key.toLowerCase() === 'y')) { e.preventDefault(); redo(); return; }
-    const keys = { t: 'trend', h: 'hline', m: 'measure', b: 'brush' };
+    if (e.key === 'Enter' && selected?.type === 'text') { e.preventDefault(); openEditor(selected, false); return; }
+    const keys = { t: 'trend', h: 'hline', m: 'measure', b: 'brush', n: 'text' };
     if (!e.metaKey && !e.ctrlKey && keys[e.key]) setTool(keys[e.key]);
   });
 

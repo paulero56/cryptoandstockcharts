@@ -193,3 +193,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .add input::placeholder { color: #4a4a4a; text-transform: none; }
 .add button { background: #1a1a1a; color: var(--amber); font-weight: 700; padding: 0 8px; }
 .intervals { flex-wrap: wrap; }
+
+/* text tool: the input shown while typing on the chart */
+.draw-text-input { position: absolute; z-index: 6; box-sizing: content-box; max-width: 70%; background: rgba(0,0,0,.85); border: 1px solid var(--c, var(--amber)); color: var(--c, var(--amber)); font: 700 15px var(--font); padding: 3px 6px; outline: 0; box-shadow: 0 0 8px var(--c, var(--amber)); }
+.draw-text-input[hidden] { display: none; }
