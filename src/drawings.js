@@ -70,11 +70,24 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     const a = toSec(c[lo - 1].time), b = toSec(c[lo].time);
     return lo - 1 + (b > a ? (s - a) / (b - a) : 0);
   }
-  const xOf = (time) => { const i = indexOf(time); return i == null ? null : ts().logicalToCoordinate(i); };
+  // The chart library only converts WHOLE bar indexes: coordinateToLogical() rounds up to a bar and
+  // logicalToCoordinate() returns 0 for a fraction. That snapped every brush point to a bar, so
+  // freehand strokes came out as straight segments / stairs. Interpolate between bars ourselves.
+  function xAtLogical(lf) {
+    const i = Math.floor(lf), a = ts().logicalToCoordinate(i), b = ts().logicalToCoordinate(i + 1);
+    return a == null || b == null ? null : a + (lf - i) * (b - a);
+  }
+  function logicalAtX(x) {
+    const l = ts().coordinateToLogical(x);
+    if (l == null) return null;
+    const a = ts().logicalToCoordinate(l), b = ts().logicalToCoordinate(l + 1);
+    return a == null || b == null || b === a ? l : l + (x - a) / (b - a);
+  }
+  const xOf = (time) => { const i = indexOf(time); return i == null ? null : xAtLogical(i); };
   const yOf = (price) => series.priceToCoordinate(price);
   function anchorAt(point, exact = false) {
     const c = getCandles();
-    const lf = ts().coordinateToLogical(point.x) ?? 0;
+    const lf = logicalAtX(point.x) ?? 0;
     const price = series.coordinateToPrice(point.y);
     if (!c.length || price == null) return null;
     const last = c.length - 1;
