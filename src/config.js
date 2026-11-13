@@ -121,17 +121,30 @@ export const LABELS = {
 };
 
 // Timeframes, grouped like TradingView's menu. Favorites (★) show as buttons; the rest live in the ▾ menu.
+// Any other whole number of days / weeks / months also works from the command line (e.g. 20D, 7W, 18M):
+// everything that the data source doesn't offer natively is built from daily / weekly / monthly candles.
 export const INTERVAL_GROUPS = [
   { label: 'MINUTES', items: ['1m', '3m', '5m', '15m', '30m', '45m'] },
   { label: 'HOURS',   items: ['1H', '2H', '3H', '4H', '6H', '8H', '12H'] },
-  { label: 'DAYS',    items: ['1D', '2D', '3D', '5D'] },
-  { label: 'WEEKS · MONTHS', items: ['1W', '2W', '1M', '3M', '1Y'] },
+  { label: 'DAYS',    items: ['1D', '2D', '3D', '4D', '5D', '6D', '7D', '8D', '9D', '10D', '11D', '12D', '13D', '14D', '15D'] },
+  { label: 'WEEKS',   items: ['1W', '2W', '3W', '4W', '5W', '6W', '7W', '8W', '10W', '12W'] },
+  { label: 'MONTHS',  items: ['1M', '2M', '3M', '4M', '5M', '6M', '9M', '1Y'] },
 ];
 export const FAVORITE_INTERVALS = ['15m', '1H', '4H', '1D', '1W', '1M'];
 export const INTERVALS = INTERVAL_GROUPS.flatMap((g) => g.items);
-export const INTERVAL_SECONDS = {
-  '1m': 60, '3m': 180, '5m': 300, '15m': 900, '30m': 1800, '45m': 2700,
-  '1H': 3600, '2H': 7200, '3H': 10800, '4H': 14400, '6H': 21600, '8H': 28800, '12H': 43200,
-  '1D': 86400, '2D': 172800, '3D': 259200, '5D': 432000,
-  '1W': 604800, '2W': 1209600, '1M': 2592000, '3M': 7776000, '1Y': 31557600,
-};
+
+// "15m" → { n: 15, unit: 'm' }.  Units: m = minutes, H = hours, D = days, W = weeks, M = months, Y = years.
+const UNIT_SECONDS = { m: 60, H: 3600, D: 86400, W: 604800, M: 2592000, Y: 31557600 };
+const MAX_N = { m: 59, H: 23, D: 365, W: 104, M: 60, Y: 5 };
+export function parseTf(interval) {
+  const m = /^(\d+)([mHDWMY])$/.exec(interval || '');
+  if (!m) return null;
+  const n = +m[1];
+  return n >= 1 && n <= MAX_N[m[2]] ? { n, unit: m[2] } : null;
+}
+// Nominal length of one candle in seconds (months = 30 days, years = 365.25 days).
+export function intervalSeconds(interval) {
+  const tf = parseTf(interval);
+  return tf ? tf.n * UNIT_SECONDS[tf.unit] : 86400;
+}
+export const INTERVAL_SECONDS = Object.fromEntries(INTERVALS.map((iv) => [iv, intervalSeconds(iv)]));

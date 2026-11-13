@@ -11,11 +11,49 @@
 //  Double-click a text (or select it + Enter) to edit it.
 //  Undo (↶ button or Ctrl/⌘ + Z) steps back one change at a time;
 //  Ctrl/⌘ + Shift + Z (or Ctrl + Y) redoes it.
+//  Channel (C): click the two ends of the base line, then click where the
+//  parallel line goes.
+//  Drag (cursor tool): drag a drawing to move it, drag an end point to
+//  adjust it, drag a channel's second line to change its width.
 // ─────────────────────────────────────────────────────────────
 
 export const NEON = ['#39ff14', '#00f0ff', '#ff2bd6', '#ffff00', '#ff6a00', '#ff1744', '#ffffff'];
 const MEASURE = { up: '#26d07c', down: '#ff433d' };
 const toSec = (t) => (typeof t === 'number' ? t : Date.parse(t + 'T00:00:00Z') / 1000);
+const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
+
+// A drawing point's time is unix seconds (crypto / intraday) or 'YYYY-MM-DD' (stocks, daily and up).
+// Older versions could save a {year, month, day} object or null on stock charts, and one such
+// drawing stopped every drawing on that symbol from rendering → repair what can be repaired, drop the rest.
+const pad = (n) => String(n).padStart(2, '0');
+export function normTime(t) {
+  if (typeof t === 'number') return isFinite(t) ? t : null;
+  if (typeof t === 'string') return isFinite(toSec(t)) ? t : null;
+  if (t && typeof t === 'object' && t.year && t.month && t.day) return `${t.year}-${pad(t.month)}-${pad(t.day)}`;
+  return null;
+}
+const TYPES = { trend: ['p1', 'p2'], measure: ['p1', 'p2'], channel: ['p1', 'p2'], hline: ['p1'], text: ['p1'], brush: [] };
+export function sanitizeDrawings(list) {
+  if (!Array.isArray(list)) return [];
+  const fix = (p) => {
+    if (!p || typeof p.price !== 'number' || !isFinite(p.price)) return null;
+    const time = normTime(p.time);
+    return time == null ? null : { ...p, time };
+  };
+  const out = [];
+  for (const d of list) {
+    const keys = d && TYPES[d.type];
+    if (!keys) continue;
+    const next = { ...d };
+    let ok = true;
+    for (const k of keys) { next[k] = fix(d[k]); if (!next[k]) ok = false; }
+    if (d.type === 'brush') { next.pts = (d.pts || []).map(fix); if (next.pts.length < 2 || next.pts.includes(null)) ok = false; }
+    if (d.type === 'text' && !d.text) ok = false;
+    if (d.type === 'channel' && !isFinite(d.off)) ok = false;
+    if (ok) out.push(next);
+  }
+  return out;
+}
 
 function humanSpan(sec) {
   const a = Math.abs(sec);
@@ -31,6 +69,8 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
   let drawings = [], pending = null, hover = null, selected = null, tool = 'cursor', symbolKey = null, shiftDown = false;
   let color = store.get('drawColor', NEON[0]);
   let stroke = null; // brush stroke in progress
+  let hoverPt = null; // last pointer position while placing a drawing (pixels)
+  let drag = null;   // { dr, part, from, orig, moved } while dragging a drawing
 
   // ── toolbar extras: brush button + neon palette ──
   const brushBtn = document.createElement('button');
@@ -43,6 +83,11 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
   textBtn.title = 'Text — click on the chart and type (N)';
   textBtn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M3 3.5h10M8 3.5V13M6 13h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
   brushBtn.after(textBtn);
+  const channelBtn = document.createElement('button');
+  channelBtn.dataset.tool = 'channel';
+  channelBtn.title = 'Parallel channel — 2 clicks for the line, 1 more for the parallel (C)';
+  channelBtn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M1.5 10.5 11 2.5M5 14l9.5-8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  toolbar.querySelector('[data-tool="trend"]')?.after(channelBtn);
   const palette = document.createElement('div');
   palette.className = 'palette';
   palette.innerHTML = NEON.map((c) => `<button class="swatch-btn" data-color="${c}" title="Color" style="--c:${c}"></button>`).join('');
@@ -63,6 +108,7 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     const c = getCandles();
     if (!c.length) return null;
     const s = toSec(time), last = c.length - 1;
+    if (!isFinite(s)) return null;
     if (s >= toSec(c[last].time)) return last + (s - toSec(c[last].time)) / getStep();
     if (s <= toSec(c[0].time)) return 0;
     let lo = 0, hi = last;
@@ -85,25 +131,32 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
   }
   const xOf = (time) => { const i = indexOf(time); return i == null ? null : xAtLogical(i); };
   const yOf = (price) => series.priceToCoordinate(price);
-  function anchorAt(point, exact = false) {
-    const c = getCandles();
-    const lf = logicalAtX(point.x) ?? 0;
-    const price = series.coordinateToPrice(point.y);
-    if (!c.length || price == null) return null;
-    const last = c.length - 1;
+  // bar index (may be fractional, may be past the last bar) → time
+  function timeAt(lf, exact = false) {
+    const c = getCandles(), last = c.length - 1;
     if (exact) { // fractional time (seconds) — used by the brush
       const i = Math.max(0, Math.min(last, Math.floor(lf))), f = lf - i;
       const next = i < last ? toSec(c[i + 1].time) : toSec(c[i].time) + getStep();
-      return { time: +(toSec(c[i].time) + (lf > last ? (lf - last) * getStep() : f * (next - toSec(c[i].time)))).toFixed(2), price };
+      return +(toSec(c[i].time) + (lf > last ? (lf - last) * getStep() : f * (next - toSec(c[i].time)))).toFixed(2);
     }
     const l = Math.round(lf);
-    let time;
-    if (l <= last) time = c[Math.max(0, l)].time;
-    else {
-      const sec = toSec(c[last].time) + (l - last) * getStep();
-      time = typeof c[last].time === 'number' ? sec : new Date(sec * 1000).toISOString().slice(0, 10);
-    }
-    return { time, price };
+    if (l <= last) return c[Math.max(0, l)].time;
+    const sec = toSec(c[last].time) + (l - last) * getStep();
+    return typeof c[last].time === 'number' ? sec : new Date(sec * 1000).toISOString().slice(0, 10);
+  }
+  function anchorAt(point, exact = false) {
+    const lf = logicalAtX(point.x) ?? 0;
+    const price = series.coordinateToPrice(point.y);
+    if (!getCandles().length || price == null) return null;
+    return { time: timeAt(lf, exact), price };
+  }
+  // Channel width: price distance from the base line (p1 → p2) to a pixel position
+  function offAt(dr, point) {
+    const x1 = xOf(dr.p1.time), x2 = xOf(dr.p2.time), y1 = yOf(dr.p1.price), y2 = yOf(dr.p2.price);
+    if ([x1, x2, y1, y2].some((v) => v == null)) return 0;
+    const yLine = x2 === x1 ? y1 : y1 + ((y2 - y1) * (point.x - x1)) / (x2 - x1);
+    const a = series.coordinateToPrice(point.y), b = series.coordinateToPrice(yLine);
+    return a == null || b == null ? 0 : a - b;
   }
 
   // ── stats for a 2-point drawing ──
@@ -118,11 +171,13 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
   }
 
   // ── rendering ──
+  let viewW = Infinity; // width of the plot area, set on every paint
   function label(ctx, text, x, y, bg, align = 'left', fg = '#fff') {
     ctx.font = '600 11px "IBM Plex Mono", monospace';
     const lines = Array.isArray(text) ? text : [text];
     const w = Math.max(...lines.map((t) => ctx.measureText(t).width)) + 12, h = lines.length * 15 + 6;
-    const left = align === 'center' ? x - w / 2 : align === 'right' ? x - w : x;
+    let left = align === 'center' ? x - w / 2 : align === 'right' ? x - w : x;
+    left = Math.max(2, Math.min(left, viewW - w - 2)); // never cut off by the price axis
     ctx.fillStyle = bg; ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(left, y, w, h, 4); else ctx.rect(left, y, w, h);
     ctx.fill();
@@ -209,6 +264,21 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     const x1 = xOf(dr.p1.time), x2 = xOf(dr.p2.time), y1 = yOf(dr.p1.price), y2 = yOf(dr.p2.price);
     if ([x1, x2, y1, y2].some((v) => v == null)) return;
     const st = stats(dr.p1, dr.p2), up = st.d >= 0;
+    if (dr.type === 'channel') {
+      const line = (ya, yb, width, dash) => neon(ctx, () => { ctx.beginPath(); ctx.moveTo(x1, ya); ctx.lineTo(x2, yb); }, col, width, dash);
+      if (dr.off == null) { line(y1, y2, w); return; } // still placing the base line
+      const y3 = yOf(dr.p1.price + dr.off), y4 = yOf(dr.p2.price + dr.off);
+      if (y3 == null || y4 == null) return;
+      ctx.fillStyle = hexA(col, 0.10);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x2, y4); ctx.lineTo(x1, y3); ctx.closePath(); ctx.fill();
+      ctx.save(); ctx.strokeStyle = hexA(col, 0.6); ctx.lineWidth = 1; ctx.setLineDash([5, 5]);
+      ctx.beginPath(); ctx.moveTo(x1, (y1 + y3) / 2); ctx.lineTo(x2, (y2 + y4) / 2); ctx.stroke(); ctx.restore(); // middle of the channel
+      line(y1, y2, w); line(y3, y4, w);
+      const width = Math.abs(dr.off / dr.p2.price) * 100;
+      label(ctx, `${pctStr(st.pct)} · ${Math.abs(st.bars)} bars · width ${width.toFixed(2)}%`, Math.max(x1, x2) + 8, (x2 >= x1 ? Math.min(y2, y4) : Math.min(y1, y3)) - 10, up ? 'rgba(38,160,100,.95)' : 'rgba(220,60,55,.95)');
+      if (isSel) { handle(ctx, x1, y1, col); handle(ctx, x2, y2, col); handle(ctx, (x1 + x2) / 2, (y3 + y4) / 2, col); }
+      return;
+    }
     if (dr.type === 'trend') {
       neon(ctx, () => { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }, col, w);
       label(ctx, `${pctStr(st.pct)} · ${Math.abs(st.bars)} bars`, x2 + 8, y2 - 10, up ? 'rgba(38,160,100,.95)' : 'rgba(220,60,55,.95)');
@@ -238,8 +308,12 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
         zOrder: () => 'top',
         renderer: () => ({
           draw: (target) => target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
+            viewW = mediaSize.width;
             for (const dr of drawings) drawOne(ctx, dr, mediaSize, dr === selected);
-            if (pending && hover) drawOne(ctx, { ...pending, p2: hover }, mediaSize, false);
+            if (pending && hover) {
+              if (pending.type === 'channel' && pending.p2) drawOne(ctx, { ...pending, off: hoverPt ? offAt(pending, hoverPt) : 0 }, mediaSize, false);
+              else drawOne(ctx, { ...pending, p2: hover, off: null }, mediaSize, false);
+            }
             if (stroke && stroke.pts.length > 1) drawOne(ctx, stroke, mediaSize, false);
           }),
         }),
@@ -268,7 +342,9 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
   const redo = () => restore(redoStack, undoStack);
   function updateUndo() { undoBtn.disabled = !undoStack.length; }
   function setSymbol(sym) {
-    symbolKey = sym; drawings = store.get('draw:' + sym, []); selected = null; pending = null; stroke = null;
+    const saved = store.get('draw:' + sym, []);
+    symbolKey = sym; drawings = sanitizeDrawings(saved); selected = null; pending = null; stroke = null; drag = null;
+    if (JSON.stringify(saved) !== JSON.stringify(drawings)) save(); // repaired / dropped broken drawings from older versions
     undoStack = []; redoStack = []; updateUndo(); redraw();
   }
 
@@ -304,14 +380,57 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
         continue;
       }
       if (segDist(point, x1, y1, x2, y2) < near) return dr;
+      if (dr.type === 'channel') {
+        const y3 = yOf(dr.p1.price + dr.off), y4 = yOf(dr.p2.price + dr.off);
+        if (y3 != null && y4 != null && segDist(point, x1, y3, x2, y4) < near) return dr;
+      }
     }
     return null;
+  }
+
+  // ── dragging: which part of a drawing is under the pointer, and how a drag changes it ──
+  function grabPart(dr, point) {
+    if (!dr.p2) return 'body';
+    const x1 = xOf(dr.p1.time), x2 = xOf(dr.p2.time), y1 = yOf(dr.p1.price), y2 = yOf(dr.p2.price);
+    if ([x1, x2, y1, y2].some((v) => v == null)) return 'body';
+    if (Math.hypot(point.x - x1, point.y - y1) < 9) return 'p1';
+    if (Math.hypot(point.x - x2, point.y - y2) < 9) return 'p2';
+    if (dr.type === 'channel') {
+      const y3 = yOf(dr.p1.price + dr.off), y4 = yOf(dr.p2.price + dr.off);
+      if (y3 != null && y4 != null && segDist(point, x1, y3, x2, y4) < 8) return 'off';
+    }
+    return 'body';
+  }
+  function dragTo(point) {
+    const { dr, part, from, orig } = drag;
+    if (part === 'p1' || part === 'p2') { const a = anchorAt(point); if (a) dr[part] = a; return; }
+    if (part === 'off') { dr.off = orig.off + offAt(orig, point) - offAt(orig, from); return; }
+    const p0 = series.coordinateToPrice(from.y), p1 = series.coordinateToPrice(point.y);
+    const l0 = logicalAtX(from.x), l1 = logicalAtX(point.x);
+    if (p0 == null || p1 == null || l0 == null || l1 == null) return;
+    const dPrice = p1 - p0, exact = dr.type === 'brush', dBars = exact ? l1 - l0 : Math.round(l1 - l0);
+    const shift = (p) => {
+      const i = indexOf(p.time);
+      return { ...p, time: dr.type === 'hline' || i == null ? p.time : timeAt(i + dBars, exact), price: p.price + dPrice };
+    };
+    if (orig.p1) dr.p1 = shift(orig.p1);
+    if (orig.p2) dr.p2 = shift(orig.p2);
+    if (orig.pts) dr.pts = orig.pts.map(shift);
+  }
+  function endDrag() {
+    if (!drag) return;
+    const { dr, orig, moved } = drag; drag = null;
+    setTool(tool); // gives the mouse back to the chart (pan / zoom)
+    if (!moved) return;
+    const next = JSON.parse(JSON.stringify(dr)), i = drawings.indexOf(dr);
+    Object.assign(dr, orig);                     // put the old state back, so undo records it…
+    if (i >= 0) commit(() => { drawings[i] = next; selected = next; }); // …then apply the move as one change
   }
 
   // ── tool state + toolbar ──
   const chartEl = document.getElementById('chart');
   function setTool(t) {
-    tool = t; pending = null;
+    tool = t; pending = null; hoverPt = null;
     toolbar.querySelectorAll('button[data-tool]').forEach((b) => b.classList.toggle('on', b.dataset.tool === t));
     chartEl.style.cursor = t === 'cursor' ? '' : 'crosshair';
     // the brush needs the mouse: stop the chart from panning while it's active
@@ -404,23 +523,53 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
   };
   chartEl.addEventListener('pointerup', endStroke, true);
 
+  // ── drag a drawing (cursor tool): press on it, move, release ──
+  chartEl.addEventListener('pointerdown', (e) => {
+    if (tool !== 'cursor' || pending || editing || e.button !== 0 || e.shiftKey) return;
+    const pt = localPoint(e);
+    if (!inPricePane(pt)) return;
+    const dr = hit(pt);
+    if (!dr) return;
+    drag = { dr, part: grabPart(dr, pt), from: pt, orig: JSON.parse(JSON.stringify(dr)), moved: false };
+    chart.applyOptions({ handleScroll: false, handleScale: false }); // the chart must not pan while we drag
+    chartEl.setPointerCapture?.(e.pointerId);
+  }, true);
+  chartEl.addEventListener('pointermove', (e) => {
+    const pt = localPoint(e);
+    if (drag) {
+      e.preventDefault(); e.stopPropagation();
+      if (!drag.moved && Math.hypot(pt.x - drag.from.x, pt.y - drag.from.y) <= 5) return; // still a click
+      drag.moved = true; selected = drag.dr;
+      dragTo(pt); redraw();
+      return;
+    }
+    if (pending) { hoverPt = pt; hover = anchorAt(pt) ?? hover; redraw(); return; }
+    if (tool === 'cursor' && !stroke) chartEl.style.cursor = inPricePane(pt) && hit(pt) ? 'grab' : '';
+  }, true);
+  chartEl.addEventListener('pointerup', endDrag, true);
+  chartEl.addEventListener('pointercancel', endDrag, true);
+
   // Clicks come from our own pointer events, not from the chart library: the library
   // drops or merges quick clicks (< 0.5 s apart become a "double-click"), which made
   // lines and horizontal lines fail at random. A click = press + release within 5 px.
   let downAt = null;
-  function finish(a) {
-    const { startedAt, ...dr } = pending; pending = null;
-    commit(() => drawings.push({ ...dr, p2: a }));
+  function finish(extra) {
+    const dr = { ...pending, ...extra }; pending = null;
+    commit(() => drawings.push(dr));
     setTool('cursor');
   }
   function onClick(point, shift) {
     const a = anchorAt(point);
     if (!a) return;
-    if (pending) { finish(a); return; }
+    if (pending?.type === 'channel') {
+      if (!pending.p2) { pending.p2 = a; hoverPt = point; redraw(); return; } // base line done → now the width
+      finish({ off: offAt(pending, point) }); return;
+    }
+    if (pending) { finish({ p2: a }); return; }
     const t = tool === 'cursor' && shift ? 'measure' : tool;
     if (t === 'hline') { commit(() => drawings.push({ type: 'hline', color, p1: a })); setTool('cursor'); return; }
     if (t === 'text') { setTool('cursor'); openEditor({ type: 'text', color, p1: a, text: '' }, true); return; }
-    if (t === 'trend' || t === 'measure') { pending = { type: t, color, p1: a }; hover = a; redraw(); return; }
+    if (t === 'trend' || t === 'measure' || t === 'channel') { pending = { type: t, color, p1: a }; hover = a; hoverPt = point; redraw(); return; }
     selected = hit(point);
     if (selected?.color) { color = selected.color; renderPalette(); }
     redraw();
@@ -438,15 +587,14 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     const d = hit(localPoint(e));
     if (d?.type === 'text') { selected = d; openEditor(d, false); }
   });
-  chart.subscribeCrosshairMove((p) => {
-    if (!pending || !p.point) return;
-    hover = anchorAt(p.point) ?? hover; redraw();
-  });
   document.addEventListener('keydown', (e) => { if (e.key === 'Shift') shiftDown = true; });
   document.addEventListener('keyup', (e) => { if (e.key === 'Shift') shiftDown = false; });
   document.addEventListener('keydown', (e) => {
     if (document.activeElement?.tagName === 'INPUT') return;
-    if (e.key === 'Escape') { pending = null; selected = null; stroke = null; setTool('cursor'); }
+    if (e.key === 'Escape') {
+      if (drag) { Object.assign(drag.dr, drag.orig); drag = null; } // cancel a drag in progress
+      pending = null; selected = null; stroke = null; setTool('cursor');
+    }
     if ((e.key === 'Delete' || e.key === 'Backspace') && selected) {
       e.preventDefault();
       const gone = selected; selected = null;
@@ -456,7 +604,7 @@ export function createDrawingTools({ chart, series, getCandles, getStep, fmt, fm
     if (z && !e.shiftKey) { e.preventDefault(); undo(); return; }
     if ((z && e.shiftKey) || (e.ctrlKey && e.key.toLowerCase() === 'y')) { e.preventDefault(); redo(); return; }
     if (e.key === 'Enter' && selected?.type === 'text') { e.preventDefault(); openEditor(selected, false); return; }
-    const keys = { t: 'trend', h: 'hline', m: 'measure', b: 'brush', n: 'text' };
+    const keys = { t: 'trend', h: 'hline', m: 'measure', b: 'brush', n: 'text', c: 'channel' };
     if (!e.metaKey && !e.ctrlKey && keys[e.key]) setTool(keys[e.key]);
   });
 

@@ -12,9 +12,10 @@ export const INTERVAL_MAP = {
 };
 const INTRADAY = new Set(['1m', '5m', '15m', '30m', '45m', '1H', '2H', '4H']);
 
+const MAX_OUTPUT = 5000; // Twelve Data's limit per request (still 1 credit)
 export async function fetchCandles(symbol, interval, apiKey, limit = 1000) {
   const url = `${REST}/time_series?symbol=${encodeURIComponent(symbol)}&interval=${INTERVAL_MAP[interval]}`
-    + `&outputsize=${limit}&apikey=${encodeURIComponent(apiKey || 'demo')}&timezone=UTC`;
+    + `&outputsize=${Math.min(limit, MAX_OUTPUT)}&apikey=${encodeURIComponent(apiKey || 'demo')}&timezone=UTC`;
   const res = await fetch(url);
   const json = await res.json();
   if (json.status !== 'ok') throw new Error(`Twelve Data: ${json.message || 'request failed'}`);

@@ -16,11 +16,26 @@ const toCandle = (k) => ({
   open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
 });
 
-export async function fetchCandles(symbol, interval, limit = 1000) {
-  const url = `${REST}/klines?symbol=${symbol}&interval=${INTERVAL_MAP[interval]}&limit=${limit}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Binance ${res.status}: unknown symbol "${symbol}"?`);
-  return (await res.json()).map(toCandle);
+// Binance returns at most 1000 candles per request. For more history, walk back
+// page by page with endTime (stops early when the pair has no older candles).
+const PAGE = 1000;
+export async function fetchCandles(symbol, interval, bars = PAGE) {
+  let rows = [], endTime = null;
+  while (rows.length < bars) {
+    const limit = Math.min(PAGE, bars - rows.length);
+    const url = `${REST}/klines?symbol=${symbol}&interval=${INTERVAL_MAP[interval]}&limit=${limit}` + (endTime ? `&endTime=${endTime}` : '');
+    const res = await fetch(url);
+    if (!res.ok) {
+      if (rows.length) break; // older pages are a bonus: keep what we already have
+      throw new Error(`Binance ${res.status}: unknown symbol "${symbol}"?`);
+    }
+    const page = await res.json();
+    if (!page.length) break;
+    rows = page.concat(rows);
+    if (page.length < limit) break;
+    endTime = page[0][0] - 1;
+  }
+  return rows.map(toCandle);
 }
 
 // Live updates. onCandle(candle, isClosed). Returns an unsubscribe fn.

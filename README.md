@@ -7,8 +7,9 @@ A Bloomberg-style charting terminal built with open-source tools. It looks and w
 - **Stocks / forex:** [Twelve Data](https://twelvedata.com), free API key. Open chart updates every 60 s (plus a **⟳ UPDATE** button); watchlist quotes every 10 min. Nothing is fetched while the tab is hidden or the market is closed, so a full day stays under the free 800 credits.
 - **Overlays:** EMA 5/9/21/34/55/100/200, SMA 9/100/200, SMA 9 × SMA 200 crossover signals, Bollinger Bands 20/2, HPDR Bands with coloured fills, range scale and forward projection, AutoFib
 - **Panes:** BBWP (13/252, SMA 5, 98/2 extremes), RSI 14 + SMA 14 with 30–70 zone, MACD 12/26/9, HPDRO, HPDRV, Advanced Stoch (forecast + stochastic volatility), RSI divergence (Cutler RSI, pivots, regular + hidden), Jewel~
-- **Drawing tools:** trend line (shows % and bars), horizontal line (shows % from price), freehand brush, typed text notes, measure box (change, %, bars, time, volume — like TradingView). Neon color palette with outline + glow so lines stand out on any background. Saved per symbol.
-- **Timeframes (like TradingView):** minutes 1m 3m 5m 15m 30m 45m · hours 1H 2H 3H 4H 6H 8H 12H · days 1D 2D 3D 5D · 1W 2W 1M 3M 1Y. Favorites (★) show as buttons, the rest are in the **▾** menu. Anything a data source doesn't offer natively is built from smaller candles.
+- **Drawing tools:** trend line (shows % and bars), horizontal line (shows % from price), parallel channel (two clicks for the line, one more for the parallel), freehand brush, typed text notes, measure box (change, %, bars, time, volume — like TradingView). Neon color palette with outline + glow so lines stand out on any background. Drag a drawing to move it, or drag an end point to adjust it. Saved per symbol.
+- **Timeframes (like TradingView):** minutes 1m 3m 5m 15m 30m 45m · hours 1H 2H 3H 4H 6H 8H 12H · days 1D to 15D · weeks 1W to 8W, 10W, 12W · months 1M 2M 3M 4M 5M 6M 9M · 1Y. Favorites (★) show as buttons, the rest are in the **▾** menu. Any other number of days, weeks or months works from the command line (`20D`, `7W`, `18M`). Anything a data source doesn't offer natively is built from daily, weekly or monthly candles, loading extra history so long timeframes still have enough candles. On stocks and forex an N-day candle holds N trading days; on crypto it is N calendar days.
+- **Full view for a study:** double-click the MACD, RSI, BBWP (or any other) pane and it fills the chart while the price hides. Double-click again or press **Esc** to go back.
 - **Watchlist:** add/remove any symbol; defaults include altcoins, gold (PAXGUSDT, live), USD/MXN (USDTMXN, live), Coinbase (COIN), Circle (CRCL), gold spot (XAU/USD) and USD/MXN forex
 - **Terminal UI:** command line, function keys, watchlist, signals panel
 - **Studies guide:** `guide.html` (F9, the **GUIDE** button or the **?** next to each study) explains every indicator in Spanish. Each card has **▶ VER EN EL CHART**, which opens the terminal with that study on (`/?study=hpdr,ema21`).
@@ -43,6 +44,9 @@ Deploy to Netlify by connecting the repo. `netlify.toml` is already set up.
 | **F4** | HPDR on/off |
 | **F8** | Settings |
 | **F9** | Studies guide |
+| **C** | Parallel channel: click both ends of the first line, then click where the parallel line goes |
+| **Drag** | Cursor tool: drag a drawing to move it, drag an end point to adjust it, drag a channel's second line to change its width |
+| **Double-click a study pane** | Full view of that study (double-click again or **Esc** to go back) |
 | **Ctrl/⌘ + Z** / **↶** | Undo the last drawing change (Ctrl/⌘ + Shift + Z = redo) |
 | **P** or **HIDE PANEL** | Hide / show the right panel (watchlist, studies, signals) |
 

@@ -1,6 +1,6 @@
 import './style.css';
 import { createChart, CrosshairMode, LineStyle, CandlestickSeries, HistogramSeries, LineSeries, createSeriesMarkers } from 'lightweight-charts';
-import { BRAND, DEFAULTS, MOVING_AVERAGES, CROSS, HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BB, BBWP, RSISTD, MACD, WATCHLIST, LABELS, INTERVALS, INTERVAL_SECONDS, INTERVAL_GROUPS, FAVORITE_INTERVALS } from './config.js';
+import { BRAND, DEFAULTS, MOVING_AVERAGES, CROSS, HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BB, BBWP, RSISTD, MACD, WATCHLIST, LABELS, INTERVALS, INTERVAL_GROUPS, FAVORITE_INTERVALS, intervalSeconds, parseTf } from './config.js';
 import { fetchCandles, subscribe, sourceFor, fetchCryptoTickers, fetchMarketQuotes } from './data/index.js';
 import { createDrawingTools } from './drawings.js';
 import { isMarketOpen } from './data/markets.js';
@@ -34,6 +34,7 @@ const state = {
   lastOpen: true,      // is the last candle still forming?
   unsubscribe: null,
   loadId: 0,
+  maxPane: null,       // id of the study shown full-height (double-click its pane), or null
 };
 
 // ── Formatting ──
@@ -41,7 +42,7 @@ const decimals = (p) => (p === 0 || p >= 1 ? 2 : p >= 0.01 ? 4 : 8);
 const fmt = (p) => (p == null || isNaN(p) ? '—' : p.toLocaleString('en-US', { minimumFractionDigits: decimals(Math.abs(p)), maximumFractionDigits: decimals(Math.abs(p)) }));
 const fmtPct = (p) => (p >= 0 ? '+' : '') + p.toFixed(2) + '%';
 const fmtVol = (v) => (v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(2) + 'K' : v.toFixed(2));
-const fmtTime = (t) => (typeof t === 'string' ? t : new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' '));
+const fmtTime = (t) => (typeof t === 'number' && isFinite(t) ? new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ') : String(t ?? '—'));
 
 // ── Brand ──
 $('brandTag').textContent = BRAND.ticker;
@@ -79,7 +80,7 @@ const candleSeries = chart.addSeries(CandlestickSeries, {
 const crossMarkers = createSeriesMarkers(candleSeries, []);
 const drawTools = createDrawingTools({
   chart, series: candleSeries, toolbar: $('tools'), store, fmt, fmtVol: (v) => fmtVol(v),
-  getCandles: () => state.candles, getStep: () => INTERVAL_SECONDS[state.interval],
+  getCandles: () => state.candles, getStep: () => intervalSeconds(state.interval),
 });
 
 const volumeSeries = chart.addSeries(HistogramSeries, { priceScaleId: 'vol', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
@@ -146,18 +147,52 @@ function rebuildPanes() {
 }
 function layoutPanes() {
   const panes = chart.panes(), n = panes.length - 1;
-  panes[0].setStretchFactor(n ? Math.max(2.5, n * 1.4) : 1);
-  for (let i = 1; i < panes.length; i++) panes[i].setStretchFactor(1);
+  const max = paneHandles.findIndex((h) => h.study.id === state.maxPane); // -1 = normal layout
+  if (max < 0) state.maxPane = null;
+  if (max >= 0) {
+    // one study full-height: every other pane (price included) collapses to nothing
+    panes.forEach((p, i) => p.setStretchFactor(i === max + 1 ? 1 : 0));
+  } else {
+    panes[0].setStretchFactor(n ? Math.max(2.5, n * 1.4) : 1);
+    for (let i = 1; i < panes.length; i++) panes[i].setStretchFactor(1);
+  }
+  $('legend').hidden = max >= 0;
+  document.querySelector('.chart-wrap').classList.toggle('pane-max', max >= 0);
   requestAnimationFrame(placePaneLegends);
 }
+// Double-click a study pane (MACD, RSI, BBWP…) → it fills the whole chart and the price hides.
+// Double-click again (or Esc) → back to the normal layout.
+function setMaxPane(id) {
+  state.maxPane = id || null;
+  layoutPanes();
+}
+function paneAt(clientY) {
+  return chart.panes().findIndex((p) => {
+    const r = p.getHTMLElement()?.getBoundingClientRect();
+    return r && r.height > 0 && clientY >= r.top && clientY <= r.bottom;
+  });
+}
+$('chart').addEventListener('dblclick', (e) => {
+  const rect = $('chart').getBoundingClientRect();
+  if (e.clientX >= rect.right - chart.priceScale('right').width()) return; // price axis: double-click = auto-scale
+  const i = paneAt(e.clientY);
+  if (i < 0) return;                                                       // time axis
+  if (state.maxPane) return setMaxPane(null);
+  if (i > 0 && paneHandles[i - 1]) setMaxPane(paneHandles[i - 1].study.id);
+});
 function placePaneLegends() {
   const host = $('paneLegends');
-  const base = $('chart').getBoundingClientRect();
   const panes = chart.panes();
+  // Full view: the collapsed panes above the study still take a few pixels → slide the chart up to hide them.
+  const max = paneHandles.findIndex((h) => h.study.id === state.maxPane);
+  const maxTop = max >= 0 ? panes[max + 1]?.getHTMLElement()?.getBoundingClientRect().top : null;
+  const shift = maxTop == null ? 0 : Math.max(0, Math.round(maxTop - $('chart').getBoundingClientRect().top));
+  if (($('chart').style.top || '') !== (shift ? `${-shift}px` : '')) $('chart').style.top = shift ? `${-shift}px` : '';
+  const base = document.querySelector('.chart-wrap').getBoundingClientRect();
   host.innerHTML = paneHandles.map((_, k) => {
-    const el = panes[k + 1]?.getHTMLElement();
-    if (!el) return '';
-    const top = el.getBoundingClientRect().top - base.top + 3;
+    const r = panes[k + 1]?.getHTMLElement()?.getBoundingClientRect();
+    if (!r || r.height < 16) return ''; // collapsed while another study is maximized
+    const top = r.top - base.top + 3;
     return `<div class="pane-legend" style="top:${top}px" data-k="${k}"></div>`;
   }).join('');
   renderLegend(hoverIndex ?? state.candles.length - 1);
@@ -171,7 +206,7 @@ const times = () => state.candles.map((c) => c.time);
 function futureTimes(k) {
   const last = state.candles.at(-1)?.time;
   if (typeof last !== 'number') return null; // business-day strings (stocks daily+) → no projection
-  const step = INTERVAL_SECONDS[state.interval];
+  const step = intervalSeconds(state.interval);
   return Array.from({ length: k }, (_, i) => last + step * (i + 1));
 }
 
@@ -323,7 +358,7 @@ function renderLegend(i) {
   $('legend').innerHTML = rows.join('');
   document.querySelectorAll('.pane-legend').forEach((el) => {
     const h = paneHandles[+el.dataset.k];
-    if (h) el.innerHTML = h.handle.legend(i);
+    if (h) el.innerHTML = h.handle.legend(i) + (state.maxPane ? ' <span class="amber">⤢ FULL VIEW</span> <span class="dim">double-click or Esc to go back</span>' : '');
   });
 }
 
@@ -454,7 +489,7 @@ async function load(symbol, interval) {
     state.lastOpen = true;
     // new symbol → back to automatic price scaling (undo any manual price-axis zoom)
     for (const pane of chart.panes()) for (const s of pane.getSeries()) s.priceScale().setAutoScale(true);
-    candleSeries.setData(candles);
+    candleSeries.setData(candles.map((c) => ({ ...c })));
     volumeSeries.setData(candles.map((c) => ({ time: c.time, value: c.volume, color: c.close >= c.open ? 'rgba(38,208,124,.35)' : 'rgba(255,67,61,.35)' })));
     candleSeries.applyOptions({ priceFormat: { type: 'price', precision: decimals(candles.at(-1).close), minMove: 1 / 10 ** decimals(candles.at(-1).close) } });
     draw();
@@ -480,9 +515,18 @@ function onLiveCandle(c, isClosed) {
   else if (c.time > last.time) arr.push(c);
   else return;
   state.lastOpen = !(isClosed && c.time === arr[arr.length - 1].time);
-  candleSeries.update(c);
+  // Always a copy: series.update() turns "2026-11-13" into {year, month, day} inside the object it
+  // receives. Passing our own candle corrupted state.candles on stock / forex daily+ charts, which
+  // froze the price and broke drawing near the last bar.
+  candleSeries.update({ ...c });
   volumeSeries.update({ time: c.time, value: c.volume, color: c.close >= c.open ? 'rgba(38,208,124,.35)' : 'rgba(255,67,61,.35)' });
-  draw();
+  scheduleDraw();
+}
+// Indicators are recomputed at most ~4 times per second instead of on every tick.
+let drawTimer = null;
+function scheduleDraw() {
+  if (drawTimer) return;
+  drawTimer = setTimeout(() => { drawTimer = null; draw(); }, 250);
 }
 
 // ── Intervals ──
@@ -494,9 +538,11 @@ function renderIntervals() {
   $('intervals').innerHTML = favs.map((iv) => `<button data-iv="${iv}" class="${iv === state.interval ? 'on' : ''}">${iv}</button>`).join('')
     + `<button class="tf-more" data-menu="1" title="All timeframes">▾</button>`;
   $('tfMenu').innerHTML = INTERVAL_GROUPS.map((g) => `<div class="tf-group"><div class="tf-label">${g.label}</div>`
+    + `<div class="tf-items ${g.items.length > 8 ? 'two' : ''}">`
     + g.items.map((iv) => `<div class="tf-item ${iv === state.interval ? 'on' : ''}"><button data-iv="${iv}">${iv}</button>`
       + `<button class="star ${state.favIntervals.includes(iv) ? 'fav' : ''}" data-star="${iv}" title="Show as a button">★</button></div>`).join('')
-    + '</div>').join('');
+    + '</div></div>').join('')
+    + '<div class="tf-note">Any other number works from the command line: <b>20D</b> · <b>7W</b> · <b>18M</b></div>';
 }
 function closeTfMenu() { $('tfMenu').hidden = true; }
 document.addEventListener('click', (e) => {
@@ -504,7 +550,15 @@ document.addEventListener('click', (e) => {
   const inBar = e.target.closest('#intervals'), inMenu = e.target.closest('#tfMenu');
   if (!inBar && !inMenu) return closeTfMenu();
   if (!t) return;
-  if (t.dataset.menu) { $('tfMenu').hidden = !$('tfMenu').hidden; return; }
+  if (t.dataset.menu) {
+    const menu = $('tfMenu');
+    menu.hidden = !menu.hidden; menu.style.left = '0px';
+    if (!menu.hidden) { // keep the menu inside the window
+      const r = menu.getBoundingClientRect(), over = r.right - (window.innerWidth - 8);
+      if (over > 0) menu.style.left = `${-Math.min(over, Math.max(0, r.left - 8))}px`;
+    }
+    return;
+  }
   if (t.dataset.star) {
     const iv = t.dataset.star;
     state.favIntervals = state.favIntervals.includes(iv) ? state.favIntervals.filter((x) => x !== iv) : [...state.favIntervals, iv];
@@ -579,8 +633,12 @@ function parseInterval(tok) {
   if (up === 'WEEKLY') return '1W';
   if (up === 'YEARLY' || up === '12M') return '1Y';
   if (up === '3M' || up === '3MO' || up === 'QUARTERLY') return '3M';
-  if (/^\d+[DHWY]$/.test(up) && INTERVALS.includes(up)) return up;
-  if (/^\d+M$/.test(tok) && INTERVALS.includes(tok.toLowerCase())) return tok.toLowerCase();
+  if (/^\d+[DHWY]$/.test(up) && parseTf(up)) return up;      // any number of days / weeks / hours: 20D, 7W, 5H
+  if (/^\d+M$/.test(tok)) {                                  // 5M → 5 minutes (as before) · 18M → 18 months
+    if (INTERVALS.includes(tok.toLowerCase())) return tok.toLowerCase();
+    return parseTf(tok) ? tok : null;
+  }
+  if (/^\d+m$/.test(tok) && parseTf(tok)) return tok;        // any number of minutes: 10m, 20m
   return null;
 }
 
@@ -628,11 +686,14 @@ function openHelp() {
       <tr><td><code>STOCH</code> <code>RSI</code> <code>JEWEL</code></td><td>Toggle Advanced Stoch / RSI divergence / Jewel~ + AutoFib</td></tr>
       <tr><td><code>CLEAR</code></td><td>All studies off with one click — again to restore them (same as the ALL OFF button)</td></tr>
       <tr><td><code>ADD PEPEUSDT</code> <code>DEL COIN</code></td><td>Add / remove a watchlist symbol (or use the box under the watchlist)</td></tr>
-      <tr><td><code>5D</code> <code>2W</code> <code>3M</code> <code>1Y</code></td><td>5-day, 2-week, quarterly and yearly candles (built from daily / weekly / monthly data)</td></tr>
+      <tr><td><code>5D</code> <code>2W</code> <code>3M</code> <code>1Y</code></td><td>5-day, 2-week, quarterly and yearly candles (built from daily / weekly / monthly data). The ▾ menu has 1–15 days, 1–12 weeks and 1–9 months; any other number works here too: <code>20D</code> <code>7W</code> <code>18M</code>. On stocks, N-day candles hold N trading days.</td></tr>
+      <tr><td><b>C</b></td><td>Parallel channel: click the two ends of the first line, then click where the parallel line goes.</td></tr>
+      <tr><td><b>Drag</b></td><td>With the cursor tool, drag a drawing to move it, or drag one of its end points to adjust it (Ctrl/⌘ + Z undoes it).</td></tr>
+      <tr><td><b>Double-click a study</b></td><td>Double-click the MACD, RSI, BBWP… pane to see it full-height (the price hides). Double-click again or <b>Esc</b> to go back.</td></tr>
       <tr><td><b>N</b></td><td>Text: click on the chart, type, <b>Enter</b> to place. Double-click a text (or select it + Enter) to edit it; empty it to delete.</td></tr>
       <tr><td><b>Ctrl/⌘ + Z</b></td><td>Undo the last drawing change (or the ↶ button). <b>Ctrl/⌘ + Shift + Z</b> = redo. The trash can is undoable too.</td></tr>
       <tr><td><b>P</b></td><td>Hide / show the right panel (or the HIDE PANEL button, top right)</td></tr>
-      <tr><td><b>T</b> / <b>H</b> / <b>B</b> / <b>N</b> / <b>M</b></td><td>Trend line / horizontal line / brush (click and drag) / text / measure box. <b>Shift + click</b> = quick measure. Pick a neon color in the toolbar (also recolors the selected drawing). Click a drawing + <b>Delete</b> to remove it.</td></tr>
+      <tr><td><b>T</b> / <b>H</b> / <b>B</b> / <b>N</b> / <b>M</b></td><td>Trend line / horizontal line / brush (click and drag) / text / measure box (<b>C</b> = channel). <b>Shift + click</b> = quick measure. Pick a neon color in the toolbar (also recolors the selected drawing). Click a drawing + <b>Delete</b> to remove it.</td></tr>
       <tr><td><code>KEY abc123</code></td><td>Set your Twelve Data API key</td></tr>
     </table>
     <div><a class="amber" href="./guide.html" target="_blank" rel="noopener">▶ STUDIES GUIDE (F9)</a> <span class="dim">— how every indicator works, with a link back to the chart</span></div>
@@ -683,7 +744,7 @@ const actions = {
 };
 document.addEventListener('keydown', (e) => {
   if (actions[e.key]) { e.preventDefault(); actions[e.key](); }
-  else if (e.key === 'Escape') closeModal();
+  else if (e.key === 'Escape') { if (!$('modal').hidden) closeModal(); else if (state.maxPane && document.activeElement.tagName !== 'INPUT') setMaxPane(null); }
   else if (e.key === '/' && document.activeElement.tagName !== 'INPUT') { e.preventDefault(); $('cmdInput').focus(); }
 });
 document.querySelector('.fkeys').addEventListener('click', (e) => { const k = e.target.closest('button')?.dataset.key; if (k) actions[k](); });
