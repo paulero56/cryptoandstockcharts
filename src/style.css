@@ -161,7 +161,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 /* ── Timeframe menu ── */
 .tf-wrap { position: relative; }
 .intervals .tf-more { color: var(--amber); padding: 3px 8px; }
-.tf-menu { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; display: grid; grid-template-columns: repeat(4, auto); gap: 4px 18px;
+.tf-menu { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; display: grid; grid-template-columns: repeat(5, auto); gap: 4px 18px;
   background: #0a0a0a; border: 1px solid var(--amber); padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
 .tf-menu[hidden] { display: none; }
 .tf-label { color: var(--dim); font-size: 10px; letter-spacing: 1px; margin-bottom: 4px; white-space: nowrap; }
@@ -197,3 +197,11 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 /* text tool: the input shown while typing on the chart */
 .draw-text-input { position: absolute; z-index: 6; box-sizing: content-box; max-width: 70%; background: rgba(0,0,0,.85); border: 1px solid var(--c, var(--amber)); color: var(--c, var(--amber)); font: 700 15px var(--font); padding: 3px 6px; outline: 0; box-shadow: 0 0 8px var(--c, var(--amber)); }
 .draw-text-input[hidden] { display: none; }
+
+/* timeframe menu: long groups (days, weeks) in two columns */
+.tf-items.two { display: grid; grid-template-columns: repeat(2, auto); column-gap: 10px; grid-auto-flow: column; grid-template-rows: repeat(8, auto); }
+.tf-note { grid-column: 1 / -1; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line-2); color: var(--dim); font-size: 11px; }
+.tf-note b { color: var(--amber); font-weight: 600; }
+.tf-menu { max-height: 70vh; overflow: auto; }
+.legend[hidden] { display: none; }
+.chart-wrap { overflow: hidden; }

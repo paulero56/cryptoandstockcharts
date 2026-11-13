@@ -168,3 +168,113 @@ test('every timeframe has a source: native or resampled', () => {
   assert.equal(baseInterval('COIN', '3m'), '1m');
   assert.equal(bucketKey(10800 * 5 + 100, '3H'), 5);
 });
+
+// ── Data layer: timeframes built from daily / weekly / monthly candles ──
+import { weekdayIndex, baseBars } from '../src/data/index.js';
+import { fetchCandles as binanceCandles } from '../src/data/binance.js';
+import { parseTf, intervalSeconds, INTERVALS } from '../src/config.js';
+import { normTime, sanitizeDrawings } from '../src/drawings.js';
+
+const day = (iso) => Date.parse(iso + 'T00:00:00Z') / 1000;
+const bar = (time, v = 1) => ({ time, open: v, high: v + 1, low: v - 1, close: v + 0.5, volume: 10 });
+
+test('timeframe parsing and lengths', () => {
+  assert.deepEqual(parseTf('15D'), { n: 15, unit: 'D' });
+  assert.deepEqual(parseTf('1m'), { n: 1, unit: 'm' });
+  assert.equal(parseTf('0D'), null);
+  assert.equal(parseTf('BTCUSDT'), null);
+  assert.equal(intervalSeconds('7D'), 7 * 86400);
+  assert.equal(intervalSeconds('3W'), 3 * 604800);
+  for (const iv of ['4D', '6D', '7D', '15D', '3W', '8W', '2M', '6M']) assert.ok(INTERVALS.includes(iv), iv);
+});
+
+test('base interval: days from 1D, weeks from 1W, months from 1M', () => {
+  assert.equal(baseInterval('BTCUSDT', '1D'), null);
+  assert.equal(baseInterval('BTCUSDT', '3D'), null);          // native on Binance
+  assert.equal(baseInterval('NVDA', '3D'), '1D');
+  assert.equal(baseInterval('BTCUSDT', '6D'), '1D');
+  assert.equal(baseInterval('BTCUSDT', '15D'), '1D');
+  assert.equal(baseInterval('BTCUSDT', '5W'), '1W');
+  assert.equal(baseInterval('NVDA', '4M'), '1M');
+  assert.equal(baseInterval('BTCUSDT', '1Y'), '1M');
+  assert.equal(baseInterval('BTCUSDT', '45m'), '15m');
+  assert.equal(baseInterval('NVDA', '3H'), '1H');
+  assert.equal(baseBars('BTCUSDT', '4D', '1D'), 4000);
+  assert.equal(baseBars('BTCUSDT', '15D', '1D'), 8000);       // capped
+  assert.equal(baseBars('NVDA', '15D', '1D'), 5000);          // one Twelve Data request
+});
+
+test('crypto N-day candles are fixed calendar blocks', () => {
+  const t0 = Math.floor(day('2026-01-01') / (7 * 86400)) * 7 * 86400; // start of a 7-day block
+  const days = Array.from({ length: 21 }, (_, i) => bar(t0 + i * 86400, i));
+  const out = resample(days, '7D');
+  assert.equal(out.length, 3);
+  assert.equal(out[1].time, t0 + 7 * 86400);
+  assert.equal(out[1].open, 7); assert.equal(out[1].close, 13.5);
+  assert.equal(out[1].high, 14); assert.equal(out[1].low, 6);
+  assert.equal(out[1].volume, 70);
+});
+
+test('stock N-day candles hold N trading days (weekends do not split them)', () => {
+  assert.equal(weekdayIndex(day('1970-01-05')), 0);                                   // a Monday
+  assert.equal(weekdayIndex(day('2026-11-16')) - weekdayIndex(day('2026-11-13')), 1); // Fri → Mon = next session
+  const sessions = [];
+  for (let t = day('2026-09-07'); sessions.length < 20; t += 86400) { // 4 full weeks, Mon–Fri
+    const iso = new Date(t * 1000).toISOString().slice(0, 10);
+    if (new Date(t * 1000).getUTCDay() % 6 !== 0) sessions.push(bar(iso, sessions.length));
+  }
+  const five = resample(sessions, '5D', true);
+  assert.deepEqual(five.map((c) => c.time), ['2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28']);
+  assert.ok(five.every((c) => c.volume === 50));
+  assert.ok(resample(sessions, '4D', true).slice(1, -1).every((c) => c.volume === 40)); // only the edges can be partial
+  // the old calendar-block rule cut the same weeks into uneven pieces
+  assert.ok(resample(sessions, '5D', false).some((c) => c.volume !== 50));
+});
+
+test('weeks and months group by calendar', () => {
+  assert.equal(bucketKey('2026-01-05', '2W'), bucketKey('2026-01-12', '2W'));
+  assert.notEqual(bucketKey('2026-01-12', '2W'), bucketKey('2026-01-19', '2W'));
+  assert.equal(bucketKey('2026-01-01', '3M'), bucketKey('2026-03-01', '3M'));   // Q1
+  assert.notEqual(bucketKey('2026-03-01', '3M'), bucketKey('2026-04-01', '3M'));
+  assert.equal(bucketKey('2026-01-01', '6M'), bucketKey('2026-06-01', '6M'));
+  assert.equal(bucketKey('2026-01-01', '1Y'), bucketKey('2026-12-01', '1Y'));
+  assert.notEqual(bucketKey('2025-12-01', '1Y'), bucketKey('2026-01-01', '1Y'));
+});
+
+test('Binance history is paged backwards and stops when the pair runs out', async () => {
+  const urls = [], realFetch = globalThis.fetch;
+  const total = 2300, t0 = 1_600_000_000_000; // the pair only has 2300 candles
+  globalThis.fetch = async (url) => {
+    urls.push(url);
+    const q = new URL(url).searchParams, limit = +q.get('limit');
+    const end = q.has('endTime') ? Math.floor((+q.get('endTime') - t0) / 86_400_000) : total - 1;
+    const rows = [];
+    for (let i = Math.max(0, end - limit + 1); i <= end; i++) rows.push([t0 + i * 86_400_000, '1', '2', '0.5', '1.5', '10']);
+    return { ok: true, json: async () => rows };
+  };
+  try {
+    const c = await binanceCandles('BTCUSDT', '1D', 4000);
+    assert.equal(c.length, total);
+    assert.equal(urls.length, 3);
+    assert.ok(c.every((x, i) => i === 0 || x.time - c[i - 1].time === 86400)); // in order, no gaps or repeats
+  } finally { globalThis.fetch = realFetch; }
+});
+
+// ── Drawings saved by older versions ──
+test('broken saved drawings are repaired or dropped', () => {
+  assert.equal(normTime({ year: 2026, month: 3, day: 9 }), '2026-03-09');
+  assert.equal(normTime('2026-03-09'), '2026-03-09');
+  assert.equal(normTime(1_700_000_000), 1_700_000_000);
+  assert.equal(normTime(null), null);
+  assert.equal(normTime('[object Object]'), null);
+  const out = sanitizeDrawings([
+    { type: 'trend', p1: { time: '2026-01-02', price: 10 }, p2: { time: { year: 2026, month: 11, day: 13 }, price: 12 } },
+    { type: 'brush', pts: [{ time: null, price: 1 }, { time: null, price: 2 }] },
+    { type: 'hline', p1: { time: 1_700_000_000, price: 5 } },
+    { type: 'channel', p1: { time: 1, price: 1 }, p2: { time: 2, price: 2 }, off: 0.5 },
+    { type: 'channel', p1: { time: 1, price: 1 }, p2: { time: 2, price: 2 } },
+    { type: 'nope' }, null,
+  ]);
+  assert.deepEqual(out.map((d) => d.type), ['trend', 'hline', 'channel']);
+  assert.equal(out[0].p2.time, '2026-11-13');
+});
