@@ -1,6 +1,6 @@
 import './style.css';
 import { createChart, CrosshairMode, LineStyle, CandlestickSeries, HistogramSeries, LineSeries, createSeriesMarkers } from 'lightweight-charts';
-import { BRAND, DEFAULTS, MOVING_AVERAGES, CROSS, HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BB, BBWP, RSISTD, MACD, WATCHLIST, LABELS, INTERVALS, INTERVAL_GROUPS, FAVORITE_INTERVALS, intervalSeconds, parseTf } from './config.js';
+import { BRAND, DEFAULTS, MOVING_AVERAGES, CROSS, HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BB, BBWP, RSISTD, MACD, VOLUME, WATCHLIST, LABELS, INTERVALS, INTERVAL_GROUPS, FAVORITE_INTERVALS, intervalSeconds, parseTf } from './config.js';
 import { fetchCandles, subscribe, sourceFor, fetchCryptoTickers, fetchMarketQuotes } from './data/index.js';
 import { createDrawingTools } from './drawings.js';
 import { isMarketOpen } from './data/markets.js';
@@ -27,7 +27,7 @@ const state = {
   on: {
     cross: CROSS.enabled, hpdr: HPDR.enabled, hpdrProject: HPDR.project, hpdro: HPDRO.enabled, hpdrv: HPDRV.enabled,
     stoch: STOCH.enabled, rsi: RSIDIV.enabled, jewel: JEWEL.enabled,
-    bb: BB.enabled, bbwp: BBWP.enabled, rsistd: RSISTD.enabled, macd: MACD.enabled,
+    bb: BB.enabled, bbwp: BBWP.enabled, rsistd: RSISTD.enabled, macd: MACD.enabled, volume: VOLUME.enabled,
     ...store.get('on', {}),
   },
   candles: [],
@@ -236,6 +236,10 @@ function compute() {
     d.rsistd = { rsi: r, ma: d.maOf(r, RSISTD.ma) };
   }
   if (state.on.macd) d.macd = macd(close, MACD.fast, MACD.slow, MACD.signal);
+  if (state.on.volume) {
+    const values = c.map((x) => x.volume);
+    d.volume = { values, up: c.map((x) => x.close >= x.open), ma: d.maOf(values, VOLUME.ma) };
+  }
   if (state.on.stoch) {
     const s = stochastic({ high, low, close }, STOCH);
     d.stoch = { ...s, fk: forecast(s.k, STOCH.forecastBars), fd: forecast(s.d, STOCH.forecastBars), vol: stochVolatility(close, STOCH.volatility) };
@@ -276,6 +280,7 @@ function draw() {
   if (!state.candles.length) return;
   computed = compute();
   for (const m of MOVING_AVERAGES) setOverlay(maSeries[m.id], computed.ma[m.id], !!state.visible[m.id]);
+  volumeSeries.applyOptions({ visible: !state.on.volume }); // the volume pane replaces the small bars under the price
 
   const h = computed.hpdr, fut = futureTimes(HPDR.length);
   const proj = (arr) => (h?.projection && fut ? arr.map((v, j) => ({ time: fut[j], value: v })) : []);
@@ -393,6 +398,7 @@ const TOGGLES = [
   { key: 'hpdr', label: 'HPDR BANDS', color: '#6ef5ff' },
   { key: 'hpdrProject', label: '└ PROJECT FWD', color: '#6ef5ff' },
   { key: 'bb', label: `BB ${BB.length} ${BB.mult}`, color: BB.color },
+  { key: 'volume', label: `VOLUME + ${VOLUME.ma.type} ${VOLUME.ma.length}`, color: '#26d07c', pane: true },
   { key: 'bbwp', label: 'BBWP', color: '#e8392c', pane: true },
   { key: 'rsistd', label: 'RSI', color: '#7e57c2', pane: true },
   { key: 'macd', label: 'MACD', color: '#2962ff', pane: true },
@@ -404,7 +410,7 @@ const TOGGLES = [
 ];
 
 // Each study links to its section of the guide (guide.html), and the guide links back with ?study=
-const GUIDE_ANCHOR = { cross: 'cross', hpdr: 'hpdr', hpdrProject: 'hpdr', bb: 'bb', bbwp: 'bbwp', rsistd: 'rsistd', macd: 'macd', hpdro: 'hpdro', hpdrv: 'hpdrv', stoch: 'stoch', rsi: 'rsidiv', jewel: 'jewel' };
+const GUIDE_ANCHOR = { cross: 'cross', hpdr: 'hpdr', hpdrProject: 'hpdr', bb: 'bb', volume: 'volume', bbwp: 'bbwp', rsistd: 'rsistd', macd: 'macd', hpdro: 'hpdro', hpdrv: 'hpdrv', stoch: 'stoch', rsi: 'rsidiv', jewel: 'jewel' };
 const guideLink = (anchor) => `<a class="st-help" href="./guide.html#${anchor}" target="_blank" rel="noopener" title="How it works (guide)">?</a>`;
 
 function renderStudies() {
@@ -654,7 +660,7 @@ $('cmdForm').addEventListener('submit', (e) => {
   if (head === 'ADD' && toks[1]) return addSymbol(toks[1]);
   if ((head === 'DEL' || head === 'REMOVE') && toks[1]) return removeSymbol(toks[1].toUpperCase());
   if (head === 'KEY') { state.apiKey = toks[1] || ''; store.set('apiKey', state.apiKey); return load(state.symbol, state.interval); }
-  const STUDY_CMDS = { BB: 'bb', BBWP: 'bbwp', MACD: 'macd', RSIDIV: 'rsi', HPDR: 'hpdr', HPDRO: 'hpdro', HPDRV: 'hpdrv', STOCH: 'stoch', RSI: 'rsistd', JEWEL: 'jewel', FIB: 'jewel', CROSS: 'cross' };
+  const STUDY_CMDS = { VOL: 'volume', VOLUME: 'volume', BB: 'bb', BBWP: 'bbwp', MACD: 'macd', RSIDIV: 'rsi', HPDR: 'hpdr', HPDRO: 'hpdro', HPDRV: 'hpdrv', STOCH: 'stoch', RSI: 'rsistd', JEWEL: 'jewel', FIB: 'jewel', CROSS: 'cross' };
   if (STUDY_CMDS[head] && toks.length === 1) return toggle(STUDY_CMDS[head]);
   let symbol = state.symbol, interval = state.interval;
   for (const t of toks) {
@@ -683,6 +689,7 @@ function openHelp() {
       <tr><td><code>4H</code></td><td>Change timeframe (<code>1m</code> = minute, <code>1M</code> = month)</td></tr>
       <tr><td><code>AAPL 1W</code></td><td>Stocks via Twelve Data (needs key, F8)</td></tr>
       <tr><td><code>HPDR</code> <code>HPDRO</code> <code>HPDRV</code></td><td>Toggle HPDR bands / oscillator / volatility</td></tr>
+      <tr><td><code>VOL</code></td><td>Toggle the volume pane (volume bars + average)</td></tr>
       <tr><td><code>STOCH</code> <code>RSI</code> <code>JEWEL</code></td><td>Toggle Advanced Stoch / RSI divergence / Jewel~ + AutoFib</td></tr>
       <tr><td><code>CLEAR</code></td><td>All studies off with one click — again to restore them (same as the ALL OFF button)</td></tr>
       <tr><td><code>ADD PEPEUSDT</code> <code>DEL COIN</code></td><td>Add / remove a watchlist symbol (or use the box under the watchlist)</td></tr>

@@ -33,7 +33,7 @@ Deploy to Netlify by connecting the repo. `netlify.toml` is already set up.
 | `4H` | Change only the timeframe (`1m` = minute, `1M` = month) |
 | `AAPL 1W` | Load a stock (needs a Twelve Data key: press **F8**) |
 | `HPDR` `HPDRO` `HPDRV` | Toggle HPDR bands / oscillator / volatility |
-| `BB` `BBWP` `RSI` `MACD` | Toggle Bollinger / BBWP / RSI / MACD |
+| `VOL` `BB` `BBWP` `RSI` `MACD` | Toggle the volume pane / Bollinger / BBWP / RSI / MACD |
 | `STOCH` `RSIDIV` `JEWEL` | Toggle Advanced Stoch / RSI divergence / Jewel~ + AutoFib |
 | `CLEAR` or **ALL OFF** button | Turn every study off at once; again (**RESTORE**) brings back your previous selection |
 | `ADD PEPEUSDT` / `DEL COIN` | Add / remove a watchlist symbol (or use the box under the watchlist) |
@@ -69,6 +69,7 @@ The HPDR family, Advanced Stoch, CT RSI Div and The Jewel used on TradingView ar
 |---|---|---|
 | **HPDR Bands** | Every past N-bar price change ("delta") is collected and sorted. Each range *p* is the band that held *p*% of those moves: `price[t−N] × (1 + percentile(deltas, 50 ± p/2))`. The median is the 50th percentile. Only past deltas are used. | `HPDR` (sampling 7, max array 100000, ranges 38.2…100) |
 | **BBWP** | Bollinger Band Width Percentile: band width `(upper − lower) / basis` with SMA 13 and 1 stdev, ranked against the last 252 bars (0 = tightest squeeze, 100 = widest), plus an SMA 5. Red bars at ≥ 98, blue bars at ≤ 2. | `BBWP` |
+| **Volume** | Volume bars in their own pane (green = candle closed up, red = down) with an SMA 20; the legend shows the bar as a multiple of the average. While it is on, the small volume bars under the price are hidden. | `VOLUME` |
 | **RSI / MACD / BB** | Standard formulas (Wilder RSI 14 + SMA 14, MACD 12/26/9, Bollinger 20/2). | `RSISTD`, `MACD`, `BB` |
 | **HPDRO** | Percentile rank (0–100) of the current N-bar delta, with an SMA 5. Alert dots fire when it crosses beyond the 95% range. | `HPDRO` |
 | **HPDRV** | Percentile rank of the size of the current move (abs(delta)), with an SMA 5. Higher means a more volatile move than usual. | `HPDRV` |

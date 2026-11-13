@@ -2,7 +2,7 @@
 // Each study: { id, title, create(chart, paneIndex, ctx) → handle }
 // handle: { update(data), legend(i) → html, destroy() }
 import { LineSeries, HistogramSeries, LineStyle, createSeriesMarkers } from 'lightweight-charts';
-import { HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BBWP, RSISTD, MACD } from './config.js';
+import { HPDR, HPDRO, HPDRV, STOCH, RSIDIV, JEWEL, BBWP, RSISTD, MACD, VOLUME } from './config.js';
 import { BandFill } from './primitives/bandFill.js';
 
 export const hexA = (hex, a) => {
@@ -313,4 +313,30 @@ export const MACD_STUDY = {
   },
 };
 
-export const PANE_STUDIES = [BBWP_STUDY, RSISTD_STUDY, MACD_STUDY, HPDRO_STUDY, HPDRV_STUDY, STOCH_STUDY, RSI_STUDY, JEWEL_STUDY];
+// ── Volume ──
+const fmtVol = (v) => (v == null || isNaN(v) ? '—' : v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(2) + 'K' : v.toFixed(2));
+export const VOLUME_STUDY = {
+  id: 'volume', title: 'VOL',
+  create(chart, pane) {
+    const bars = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceLineVisible: false, lastValueVisible: true }, pane);
+    const ma = addLine(chart, pane, { color: VOLUME.ma.color, lineWidth: 1, priceFormat: { type: 'volume' }, lastValueVisible: true });
+    let v = null;
+    return {
+      series: [bars, ma],
+      update(d) {
+        v = d.volume;
+        bars.setData(toLine(v.values, d.times, (_, i) => (v.up[i] ? VOLUME.up : VOLUME.down)));
+        ma.setData(VOLUME.ma.on ? toLine(v.ma, d.times) : []);
+      },
+      legend(i) {
+        const x = v?.values[i], m = v?.ma[i];
+        const rel = x != null && m ? ` <span class="dim">${(x / m).toFixed(2)}× avg</span>` : '';
+        return `<b>VOL</b> <span style="color:${v?.up[i] ? '#26d07c' : '#ff433d'}">${fmtVol(x)}</span>`
+          + (VOLUME.ma.on ? ` <span style="color:${VOLUME.ma.color}">${VOLUME.ma.type}${VOLUME.ma.length} ${fmtVol(m)}</span>${rel}` : '');
+      },
+      destroy() { chart.removeSeries(bars); chart.removeSeries(ma); },
+    };
+  },
+};
+
+export const PANE_STUDIES = [VOLUME_STUDY, BBWP_STUDY, RSISTD_STUDY, MACD_STUDY, HPDRO_STUDY, HPDRV_STUDY, STOCH_STUDY, RSI_STUDY, JEWEL_STUDY];

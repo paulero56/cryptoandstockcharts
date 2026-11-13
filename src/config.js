@@ -59,6 +59,9 @@ export const HPDR = {
 export const HPDRO = { enabled: false,  lineWidth: 2, ma: { on: true, type: 'SMA', length: 5, color: '#e84a4a', width: 2 }, alerts: true };
 export const HPDRV = { enabled: false, lineWidth: 2, ma: { on: true, type: 'SMA', length: 5, color: '#ffffff', width: 2 } };
 
+// ── Volume in its own pane, with a moving average (when on, the small volume bars under the price hide) ──
+export const VOLUME = { enabled: true, ma: { on: true, type: 'SMA', length: 20, color: '#ffa028' }, up: 'rgba(38,208,124,.75)', down: 'rgba(255,67,61,.75)' };
+
 // ── BBWP — Bollinger Band Width Percentile ("BBWP close SMA 13 252 … SMA 5 98 2") ──
 export const BBWP = {
   enabled: true,
